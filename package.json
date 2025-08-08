@@ -1,0 +1,21 @@
+{
+  "name": "ollama-desk",
+  "private": true,
+  "workspaces": [
+    "electron",
+    "next-app",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "concurrently -n NEXT,ELEC -c blue,magenta \"pnpm -C next-app dev\" \"wait-on tcp:3000 && pnpm -C electron dev\"",
+    "build": "pnpm -C next-app build && pnpm -C electron build",
+    "start": "concurrently -n NEXT,ELEC -c blue,magenta \"pnpm -C next-app start\" \"wait-on tcp:3000 && pnpm -C electron start\"",
+    "lint": "pnpm -C next-app typecheck"
+  },
+  "devDependencies": {
+    "concurrently": "^9.0.0",
+    "wait-on": "^8.0.0"
+  },
+  "packageManager": "pnpm@10.6.4"
+}
+

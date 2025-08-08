@@ -1,0 +1,20 @@
+{
+  "name": "electron-shell",
+  "private": true,
+  "type": "commonjs",
+  "main": "dist/main.js",
+  "scripts": {
+    "dev": "tsc -w -p tsconfig.json & wait-on file:dist/main.js && electron dist/main.js",
+    "build": "tsc -p tsconfig.json",
+    "start": "electron dist/main.js"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.10",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.8.2"
+  },
+  "dependencies": {
+    "electron": "^31.7.7",
+    "wait-on": "^8.0.0"
+  }
+}

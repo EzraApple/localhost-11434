@@ -1,0 +1,5 @@
+packages:
+  - 'electron'
+  - 'next-app'
+  - 'packages/*'
+
