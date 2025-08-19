@@ -7,8 +7,8 @@ function getDevServerURL() {
 }
 async function createWindow() {
     const win = new electron_1.BrowserWindow({
-        width: 1200,
-        height: 800,
+        width: 1800,
+        height: 1200,
         webPreferences: {
             contextIsolation: true,
             sandbox: true,

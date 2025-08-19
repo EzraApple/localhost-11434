@@ -4,6 +4,8 @@ import { type Metadata } from "next";
 import { Geist } from "next/font/google";
 
 import { TRPCReactProvider } from "~/trpc/react";
+import { SidebarInset, SidebarProvider } from "~/components/ui/sidebar";
+import { ChatSelectSidebar } from "./_components/chat-select-sidebar";
 
 export const metadata: Metadata = {
   title: "Create T3 App",
@@ -23,22 +25,10 @@ export default function RootLayout({
     <html lang="en" className={`${geist.variable}`}>
       <body className="min-h-dvh bg-neutral-950 text-neutral-100">
         <TRPCReactProvider>
-          <div className="grid min-h-dvh grid-cols-[280px_1fr]">
-            <aside className="border-r border-white/10 bg-neutral-900/50 backdrop-blur-md">
-              <div className="p-4 font-semibold">Ollama Desk</div>
-              <nav className="p-2 text-sm text-neutral-300">
-                <button className="w-full rounded-md bg-white/5 px-3 py-2 text-left hover:bg-white/10">
-                  New Chat
-                </button>
-                <div className="mt-4 space-y-1">
-                  <div className="px-3 py-1 text-xs uppercase text-neutral-500">Today</div>
-                  {/* Placeholder items */}
-                  <div className="px-3 py-1">Welcome</div>
-                </div>
-              </nav>
-            </aside>
-            <main className="overflow-auto">{children}</main>
-          </div>
+          <SidebarProvider>
+            <ChatSelectSidebar />
+            <SidebarInset>{children}</SidebarInset>
+          </SidebarProvider>
         </TRPCReactProvider>
       </body>
     </html>
