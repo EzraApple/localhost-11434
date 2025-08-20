@@ -33,7 +33,7 @@ export const MessageContent = ({
   <div
     className={cn(
       'flex flex-col gap-2 overflow-hidden rounded-lg px-4 py-3 text-foreground text-sm',
-      'group-[.is-user]:bg-[#132524cc] group-[.is-user]:text-[#e2e7e5] group-[.is-user]:border group-[.is-user]:border-[#2a403e]/60',
+      'group-[.is-user]:bg-[#132827cc] group-[.is-user]:text-[#e5e9e8] group-[.is-user]:border group-[.is-user]:border-[#2b3f3e]/50',
       'group-[.is-assistant]:w-full group-[.is-assistant]:bg-background group-[.is-assistant]:text-foreground group-[.is-assistant]:backdrop-blur-0 group-[.is-assistant]:border-0 group-[.is-assistant]:overflow-visible',
       className
     )}

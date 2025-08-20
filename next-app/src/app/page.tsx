@@ -34,7 +34,7 @@ export default function Home() {
   return (
     <div className="relative min-h-dvh pb-40">
       <div className="pointer-events-none absolute inset-0 -z-10">
-        <div className="absolute inset-0 opacity-40" style={{ backgroundImage: 'radial-gradient(closest-corner at 120px 36px, rgba(9, 83, 74, 0.18), rgba(9, 83, 74, 0.08)), linear-gradient(rgb(12, 24, 25) 15%, rgb(8, 14, 15))' }} />
+        <div className="absolute inset-0 opacity-40" style={{ backgroundImage: 'radial-gradient(closest-corner at 120px 36px, rgba(14, 78, 71, 0.16), rgba(14, 78, 71, 0.08)), linear-gradient(rgb(12, 24, 25) 15%, rgb(8, 14, 15))' }} />
         <div className="absolute inset-0 bg-noise" />
         <div className="absolute inset-0 bg-[#0a1616]/30" />
       </div>
@@ -44,7 +44,7 @@ export default function Home() {
           {basePrompts.map((p) => (
             <button
               key={p}
-              className="h-9 rounded-full px-5 py-2 font-semibold outline outline-1 outline-[#0b3f3a]/40 bg-[#0b3f3a]/15 text-[#d3e6e2] hover:bg-[#0b3f3a]/25"
+              className="h-9 rounded-full px-5 py-2 font-semibold outline outline-1 outline-[#113936]/50 bg-[#113936]/15 text-[#d3e6e2] hover:bg-[#113936]/25"
               type="button"
               onClick={() => setPrefill(p)}
             >

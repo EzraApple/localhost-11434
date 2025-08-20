@@ -37,13 +37,13 @@ export const CodeBlock = ({
   <CodeBlockContext.Provider value={{ code }}>
     <div
       className={cn(
-        'relative w-full overflow-hidden rounded-lg border border-[#0b3f3a]/40 bg-[#0a1616] text-foreground',
+        'relative w-full overflow-hidden rounded-lg border border-[#113936]/40 bg-[#0a1515] text-foreground',
         className
       )}
       {...props}
     >
       {/* Header bar with language and copy */}
-      <div className="flex items-center justify-between border-b border-[#0b3f3a]/40 bg-[#132524] px-3 py-1.5 text-[11px] leading-none text-[#cfd6d4]">
+      <div className="flex items-center justify-between border-b border-[#113936]/40 bg-[#1a2f2e] px-3 py-1.5 text-[11px] leading-none text-[#cfd6d4]">
         <span className="uppercase tracking-wide opacity-80">{language}</span>
         <div className="flex items-center gap-1">
           <CodeBlockCopyButton className="size-6 text-[#cfd6d4] hover:bg-transparent" aria-label="Copy code" />

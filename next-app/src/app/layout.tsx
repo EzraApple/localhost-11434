@@ -30,12 +30,12 @@ export default function RootLayout({
           <ChatStoreProvider>
             <SidebarProvider>
               <ChatSelectSidebar />
-              <SidebarInset className="h-dvh overflow-y-auto md:peer-data-[variant=inset]:shadow-sm md:peer-data-[variant=inset]:border md:peer-data-[variant=inset]:border-[#0b3f3a]">
+              <SidebarInset className="h-dvh overflow-y-auto md:peer-data-[variant=inset]:shadow-sm md:peer-data-[variant=inset]:border md:peer-data-[variant=inset]:border-[#113936]">
                 <div className="relative">
                   <div className="pointer-events-none absolute inset-0 -z-10">
-                    <div className="absolute inset-0 opacity-40" style={{ backgroundImage: 'radial-gradient(closest-corner at 120px 36px, rgba(9, 83, 74, 0.22), rgba(9, 83, 74, 0.10)), linear-gradient(rgb(9, 18, 20) 15%, rgb(5, 10, 11))' }} />
+                    <div className="absolute inset-0 opacity-40" style={{ backgroundImage: 'radial-gradient(closest-corner at 120px 36px, rgba(12, 78, 70, 0.20), rgba(12, 78, 70, 0.10)), linear-gradient(rgb(9, 18, 20) 15%, rgb(5, 10, 11))' }} />
                     <div className="absolute inset-0 bg-noise" />
-                    <div className="absolute inset-0 bg-[#0a1616]/40" />
+                    <div className="absolute inset-0 bg-[#0b1515]/40" />
                   </div>
                   <div className="relative">
                     <div className="sticky top-0 z-10 pointer-events-none">
