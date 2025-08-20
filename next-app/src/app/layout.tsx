@@ -4,10 +4,9 @@ import { type Metadata } from "next";
 import { Geist } from "next/font/google";
 
 import { TRPCReactProvider } from "~/trpc/react";
-import { SidebarInset, SidebarProvider } from "~/components/ui/sidebar";
-import { ChatSelectSidebar } from "./_components/chat-select-sidebar";
 import { ChatStoreProvider } from "~/lib/chat-store";
-import TopRightNotch from "./_components/top-right-notch";
+import { LayoutContent } from "./_components/layout-content";
+import { Toaster } from "~/components/ui/sonner";
 
 export const metadata: Metadata = {
   title: "Create T3 App",
@@ -28,26 +27,8 @@ export default function RootLayout({
       <body className="min-h-dvh bg-[#071315] text-neutral-100 overflow-hidden">
         <TRPCReactProvider>
           <ChatStoreProvider>
-            <SidebarProvider>
-              <ChatSelectSidebar />
-              <SidebarInset className="h-dvh overflow-y-auto md:peer-data-[variant=inset]:shadow-sm md:peer-data-[variant=inset]:border md:peer-data-[variant=inset]:border-[#113936]">
-                <div className="relative">
-                  <div className="pointer-events-none absolute inset-0 -z-10">
-                    <div className="absolute inset-0 opacity-40" style={{ backgroundImage: 'radial-gradient(closest-corner at 120px 36px, rgba(12, 78, 70, 0.20), rgba(12, 78, 70, 0.10)), linear-gradient(rgb(9, 18, 20) 15%, rgb(5, 10, 11))' }} />
-                    <div className="absolute inset-0 bg-noise" />
-                    <div className="absolute inset-0 bg-[#0b1515]/40" />
-                  </div>
-                  <div className="relative">
-                    <div className="sticky top-0 z-10 pointer-events-none">
-                      <TopRightNotch />
-                    </div>
-                    <div className="relative z-0">
-                      {children}
-                    </div>
-                  </div>
-                </div>
-              </SidebarInset>
-            </SidebarProvider>
+            <LayoutContent>{children}</LayoutContent>
+            <Toaster richColors position="top-right" />
           </ChatStoreProvider>
         </TRPCReactProvider>
       </body>

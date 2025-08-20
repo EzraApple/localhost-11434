@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useChatStore } from '~/lib/chat-store'
 import type { UIMessage } from '~/lib/chat-types'
+import { toast } from 'sonner'
+import { api } from '~/trpc/react'
 
 // moved to lib/chat-types
 
@@ -17,21 +19,27 @@ export function useOllamaChat(chatId: string) {
   const [reasoningDurations, setReasoningDurations] = useState<Record<string, number>>({})
   const currentAssistantIdRef = useRef<string | null>(null)
   const reasoningStartRef = useRef<number | null>(null)
+  const createMessageMutation = api.messages.create.useMutation()
+  const hasHydratedRef = useRef(false)
 
-  // rehydrate chat state from sessionStorage per chat id
+  // rehydrate chat state from DB per chat id
+  const { data: initialData } = api.messages.list.useQuery(
+    { chatId },
+    { enabled: !!chatId, refetchOnWindowFocus: false, refetchOnReconnect: false, staleTime: 60_000 }
+  )
   useEffect(() => {
     selectChat(chatId)
-    try {
-      const raw = sessionStorage.getItem(`chat:${chatId}:messages`)
-      if (raw) {
-        const parsed = JSON.parse(raw) as UIMessage[]
-        setMessages(parsed)
-      }
-      const rd = sessionStorage.getItem(`chat:${chatId}:rd`)
-      if (rd) setReasoningDurations(JSON.parse(rd) as Record<string, number>)
-    } catch {}
+    if (!hasHydratedRef.current && initialData?.messages && messages.length === 0) {
+      const fromDb: UIMessage[] = initialData.messages.map(m => ({
+        id: m.id,
+        role: String(m.role).toLowerCase() as UIMessage['role'],
+        parts: (m.parts as any[]) as UIMessage['parts'],
+      }))
+      setMessages(fromDb)
+      hasHydratedRef.current = true
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [chatId])
+  }, [chatId, initialData?.messages, messages.length])
 
   
 
@@ -41,13 +49,25 @@ export function useOllamaChat(chatId: string) {
       role: 'user',
       parts: [{ type: 'text', text }],
     }
+    // prevent initial DB hydration from wiping optimistic UI
+    hasHydratedRef.current = true
     setMessages((prev) => [...prev, msg])
   }, [])
 
   const submit = useCallback(
-    async ({ text, model, reasoningLevel = 'high' }: { text: string; model: string; reasoningLevel?: 'low' | 'medium' | 'high' }) => {
+    async ({ text, model, reasoningLevel }: { text: string; model: string; reasoningLevel?: 'low' | 'medium' | 'high' }) => {
       if (!text.trim()) return
       appendUser(text)
+      // persist user message to DB (fire-and-forget to avoid UI lag)
+      createMessageMutation.mutate(
+        { chatId, role: 'USER', parts: [{ type: 'text', text }] } as any,
+        {
+          onError: (e) => {
+            // eslint-disable-next-line no-console
+            console.warn('[chat] failed to persist user message:', (e as Error).message)
+          },
+        }
+      )
       setStatus('submitted')
       setStreamPhase('reasoning')
       // create an assistant message id upfront
@@ -62,8 +82,11 @@ export function useOllamaChat(chatId: string) {
           messages: messages
             .map((m) => ({ role: m.role, content: m.parts.map((p) => p.text).join(' ') }))
             .concat([{ role: 'user' as const, content: text }]),
-          think: true,
+          // Only enable think when we have an explicit supported reasoning level
+          think: reasoningLevel ? reasoningLevel : false,
           reasoningLevel,
+          chatId,
+          assistantMessageId: currentAssistantIdRef.current,
         }
 
         const res = await fetch('/api/ollama/chat', {
@@ -73,6 +96,14 @@ export function useOllamaChat(chatId: string) {
           signal: controller.signal,
         })
         if (!res.ok || !res.body) {
+          let detail = ''
+          try {
+            const data = await res.json()
+            detail = String(data?.error || '')
+          } catch {}
+          toast.error('Chat failed', {
+            description: detail || 'The server returned an error while starting the chat.',
+          })
           setStatus('error')
           setStreamPhase('idle')
           return
@@ -99,17 +130,19 @@ export function useOllamaChat(chatId: string) {
             } catch {
               continue
             }
+            if (obj.kind === 'error') {
+              toast.error('Streaming error', { description: String(obj.error || 'An unknown streaming error occurred') })
+              setStatus('error')
+              setStreamPhase('idle')
+              continue
+            }
             if (obj.kind === 'done') {
               setStatus('ready')
               setStreamPhase('idle')
               // finalize duration if we recorded a start
               if (currentAssistantIdRef.current && reasoningStartRef.current !== null) {
                 const seconds = Math.max(0, Math.round((Date.now() - reasoningStartRef.current) / 1000))
-                setReasoningDurations(prev => {
-                  const next = { ...prev, [currentAssistantIdRef.current as string]: seconds }
-                  try { sessionStorage.setItem(`chat:${chatId}:rd`, JSON.stringify(next)) } catch {}
-                  return next
-                })
+                setReasoningDurations(prev => ({ ...prev, [currentAssistantIdRef.current as string]: seconds }))
               }
               currentAssistantIdRef.current = null
               reasoningStartRef.current = null
@@ -136,9 +169,6 @@ export function useOllamaChat(chatId: string) {
                 parts.push({ type: kind, text: textDelta })
               }
               next[lastIndex] = { ...lastMsg, parts }
-              try {
-                sessionStorage.setItem(`chat:${chatId}:messages`, JSON.stringify(next))
-              } catch {}
               return next
             })
             // start reasoning timer when the first reasoning chunk arrives
@@ -150,13 +180,15 @@ export function useOllamaChat(chatId: string) {
         setStatus('ready')
         setStreamPhase('idle')
       } catch (e) {
+        const msg = e instanceof Error ? e.message : 'Unknown error'
+        toast.error('Chat error', { description: msg })
         setStatus('error')
         setStreamPhase('idle')
       } finally {
         abortRef.current = null
       }
     },
-    [appendUser, messages, streamPhase]
+    [appendUser, chatId, messages, streamPhase]
   )
 
   return {

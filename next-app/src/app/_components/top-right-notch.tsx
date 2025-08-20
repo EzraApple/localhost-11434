@@ -1,6 +1,7 @@
 "use client"
 
 import { Settings } from "lucide-react"
+import Link from "next/link"
 import { cn } from "~/lib/utils"
 import { Button } from "~/components/ui/button"
 import { Tooltip, TooltipContent, TooltipTrigger } from "~/components/ui/tooltip"
@@ -21,12 +22,15 @@ export default function TopRightNotch({ className }: { className?: string }) {
         <Tooltip>
           <TooltipTrigger asChild>
             <Button
+              asChild
               variant="ghost"
               size="icon"
               className="h-7 w-7 text-neutral-200 hover:text-white hover:bg-white/10"
               aria-label="Settings"
             >
-              <Settings className="h-4 w-4" />
+              <Link href="/settings" prefetch>
+                <Settings className="h-4 w-4" />
+              </Link>
             </Button>
           </TooltipTrigger>
           <TooltipContent side="bottom">Settings</TooltipContent>

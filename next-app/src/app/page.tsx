@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { api } from '~/trpc/react'
+import { toast } from 'sonner'
 import { useChatStore } from '~/lib/chat-store'
 import ChatInput from '~/components/chat-input'
 
@@ -11,7 +12,7 @@ type ModelInfo = { name: string }
 export default function Home() {
   const router = useRouter()
   const { createChat, selectChat, selectedModel: storedModel, setSelectedModel } = useChatStore()
-  const { data } = api.ollama.listModels.useQuery()
+  const { data, error } = api.ollama.listModels.useQuery()
   const models: ModelInfo[] = data?.models ?? []
   const [selectedModel, setSelectedModelState] = useState(storedModel ?? '')
   useEffect(() => {
@@ -21,6 +22,13 @@ export default function Home() {
       setSelectedModel(m)
     }
   }, [models, selectedModel, setSelectedModel, storedModel])
+
+  useEffect(() => {
+    if (error) {
+      const msg = (error as any)?.message ?? 'Failed to load models'
+      toast.error('Models unavailable', { description: String(msg) })
+    }
+  }, [error])
 
   const basePrompts: string[] = [
     'Summarize this document',
@@ -61,7 +69,7 @@ export default function Home() {
         maxWidthClass="max-w-3xl"
         onSubmit={({ text, model }) => {
           const id = crypto.randomUUID()
-          createChat(id, 'New Chat')
+          createChat(id, 'New Chat', model)
           selectChat(id)
           setSelectedModel(model)
           // store initial prompt in sessionStorage to avoid URL params

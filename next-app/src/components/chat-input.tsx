@@ -13,6 +13,8 @@ import {
   PromptInputTextarea,
   PromptInputToolbar,
 } from '~/components/ai-elements/prompt-input'
+import { useOllamaModelCapabilities } from '~/hooks/use-ollama-model-capabilities'
+import { toast } from 'sonner'
 
 type ChatStatus = 'submitted' | 'streaming' | 'ready' | 'error'
 
@@ -33,6 +35,7 @@ export function ChatInput({ models, defaultModel, placeholder = 'Type your messa
   const [model, setModel] = useState('')
   const [status, setStatus] = useState<ChatStatus>('ready')
   const [reasoningLevel, setReasoningLevel] = useState<'low' | 'medium' | 'high'>('high')
+  const { data: caps, error: capsError, thinkLevels } = useOllamaModelCapabilities(model)
 
   const effectiveDefault = useMemo(() => defaultModel ?? models[0]?.name ?? '', [defaultModel, models])
 
@@ -45,11 +48,32 @@ export function ChatInput({ models, defaultModel, placeholder = 'Type your messa
     if (typeof prefillText === 'string') setText(prefillText)
   }, [prefillText])
 
+  // adjust reasoning level to a supported one when model changes
+  useEffect(() => {
+    if (!model) return
+    if (thinkLevels.size === 0) {
+      // no think support; clear selection by setting to 'high' but we will not send it
+      setReasoningLevel('high')
+      return
+    }
+    if (!thinkLevels.has(reasoningLevel)) {
+      // pick highest available level
+      const pick = (thinkLevels.has('high') && 'high') || (thinkLevels.has('medium') && 'medium') || 'low'
+      setReasoningLevel(pick as any)
+    }
+  }, [model, thinkLevels])
+
+  useEffect(() => {
+    if (capsError) toast.error('Model capabilities error', { description: String((capsError as any)?.message || capsError) })
+  }, [capsError])
+
   const handleSubmit: FormEventHandler<HTMLFormElement> = (event) => {
     event.preventDefault()
     if (!text.trim()) return
     // bubble up
-    onSubmit?.({ text, model, reasoningLevel })
+    // if model doesn't support think, pass undefined to avoid enabling think
+    const rl = thinkLevels.size > 0 && thinkLevels.has(reasoningLevel) ? reasoningLevel : undefined
+    onSubmit?.({ text, model, reasoningLevel: rl as any })
     // temporary internal status handling (will be parent-controlled later)
     setStatus('submitted')
     setTimeout(() => setStatus('streaming'), 200)
@@ -89,23 +113,25 @@ export function ChatInput({ models, defaultModel, placeholder = 'Type your messa
                     ))}
                   </PromptInputModelSelectContent>
                 </PromptInputModelSelect>
-                <PromptInputModelSelect onValueChange={(v) => setReasoningLevel(v as any)} value={reasoningLevel}>
-                  <PromptInputModelSelectTrigger className="h-8">
-                    <PromptInputModelSelectValue>
-                      <div className="inline-flex items-center gap-1 text-xs">
-                        <Brain className="h-3.5 w-3.5" />
-                        <span className="capitalize">{reasoningLevel}</span>
-                      </div>
-                    </PromptInputModelSelectValue>
-                  </PromptInputModelSelectTrigger>
-                  <PromptInputModelSelectContent>
-                    {(['low','medium','high'] as const).map(level => (
-                      <PromptInputModelSelectItem key={level} value={level}>
-                        <span className="capitalize">{level}</span>
-                      </PromptInputModelSelectItem>
-                    ))}
-                  </PromptInputModelSelectContent>
-                </PromptInputModelSelect>
+                {thinkLevels.size > 0 && (
+                  <PromptInputModelSelect onValueChange={(v) => setReasoningLevel(v as any)} value={reasoningLevel}>
+                    <PromptInputModelSelectTrigger className="h-8">
+                      <PromptInputModelSelectValue>
+                        <div className="inline-flex items-center gap-1 text-xs">
+                          <Brain className="h-3.5 w-3.5" />
+                          <span className="capitalize">{reasoningLevel}</span>
+                        </div>
+                      </PromptInputModelSelectValue>
+                    </PromptInputModelSelectTrigger>
+                    <PromptInputModelSelectContent>
+                      {(['low','medium','high'] as const).filter(level => thinkLevels.has(level)).map(level => (
+                        <PromptInputModelSelectItem key={level} value={level}>
+                          <span className="capitalize">{level}</span>
+                        </PromptInputModelSelectItem>
+                      ))}
+                    </PromptInputModelSelectContent>
+                  </PromptInputModelSelect>
+                )}
               </div>
               <div />
               <PromptInputSubmit disabled={!text} status={status} />

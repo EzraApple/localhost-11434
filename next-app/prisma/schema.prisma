@@ -10,11 +10,41 @@ datasource db {
     url      = env("DATABASE_URL")
 }
 
-model Post {
-    id        Int      @id @default(autoincrement())
-    name      String
-    createdAt DateTime @default(now())
-    updatedAt DateTime @updatedAt
+// Chat and Message models for persistent local storage
 
-    @@index([name])
+model Chat {
+  id            String    @id
+  title         String
+  model         String?
+  lastSetModel  String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  lastMessageAt DateTime?
+  pinned        Boolean   @default(false)
+  pinnedAt      DateTime?
+  messages      Message[]
+
+  @@index([updatedAt])
+  @@index([lastMessageAt])
+  @@index([pinned])
+  @@index([pinnedAt])
+}
+
+model Message {
+  id        String      @id
+  chatId    String
+  chat      Chat        @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  role      MessageRole
+  parts     Json
+  createdAt DateTime    @default(now())
+  index     Int?
+
+  @@index([chatId, createdAt])
+}
+
+enum MessageRole {
+  USER
+  ASSISTANT
+  SYSTEM
+  TOOL
 }

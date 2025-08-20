@@ -10,7 +10,9 @@ import { Message, MessageContent } from '~/components/ai-elements/message'
 import { Reasoning, ReasoningContent, ReasoningTrigger } from '~/components/ai-elements/reasoning'
 import { Response } from '~/components/ai-elements/response'
 import { useChatStore } from '~/lib/chat-store'
+import { toast } from 'sonner'
 // call server route for chat name to avoid importing node-only SDK in client
+
 
 type ModelInfo = { name: string }
 
@@ -18,15 +20,21 @@ export default function ChatByIdPage() {
   const params = useParams<{ id: string }>()
   const id = params?.id
   const search = useSearchParams()
-  const { data } = api.ollama.listModels.useQuery()
+  const { data, error } = api.ollama.listModels.useQuery()
   const models: ModelInfo[] = data?.models ?? []
   const [selectedModel, setSelectedModel] = useState('')
-  const { renameChat, selectChat } = useChatStore()
+  const { renameChat, selectChat, selectedModel: storeModel, chats } = useChatStore()
   useEffect(() => {
-    if (models.length && !selectedModel) setSelectedModel(models[0]!.name)
-  }, [models, selectedModel])
+    if (!models.length || selectedModel) return
+    const chatId = String(id)
+    const chat = chats.find(c => c.id === chatId)
+    const perChatModel = chat?.lastSetModel || undefined
+    setSelectedModel(perChatModel || storeModel || models[0]!.name)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [models, selectedModel, storeModel, chats, id])
 
   const { messages, status, streamPhase, submit } = useOllamaChat(String(id))
+  const setModelMutation = api.chats.setModel.useMutation()
 
   // auto-submit first message from landing page (guard against double-invoke)
   const didAutoSubmitRef = useRef(false)
@@ -56,11 +64,22 @@ export default function ChatByIdPage() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ model, firstMessage: first }),
           })
-          const { title } = await r.json()
-          const name = title as string
-          renameChat(String(id), name)
-        } catch {}
+          const data = await r.json()
+          if (!r.ok) {
+            const detail = String(data?.error || '')
+            toast.error('Failed to name chat', { description: detail || 'Server responded with an error.' })
+          } else {
+            const name = String(data?.title ?? '')
+            if (name) renameChat(String(id), name)
+          }
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : 'Unknown error'
+          toast.error('Failed to name chat', { description: msg })
+        }
       })()
+      setSelectedModel(model)
+      // persist per-chat lastSetModel
+      setModelMutation.mutate({ id: String(id), model })
       submit({ text: first, model })
       // clear query params from history without reloading
       const url = new URL(window.location.href)
@@ -71,11 +90,18 @@ export default function ChatByIdPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  useEffect(() => {
+    if (error) {
+      const msg = (error as any)?.message ?? 'Failed to load models'
+      toast.error('Models unavailable', { description: String(msg) })
+    }
+  }, [error])
+
   return (
-    <div className="relative mx-auto min-h-dvh flex w-full max-w-4xl flex-1 flex-col gap-4 p-4 pb-0">
+    <div className="relative mx-auto h-dvh flex w-full max-w-4xl flex-1 flex-col gap-4 p-4 pb-0">
         {/* header strip now rendered in layout to avoid occlusion */}
         <Conversation>
-          <ConversationContent className="pb-40">
+          <ConversationContent className="pb-32">
             {messages.map((m) => (
               <Message key={m.id} from={m.role}>
                 <MessageContent>
@@ -93,15 +119,30 @@ export default function ChatByIdPage() {
                 </MessageContent>
               </Message>
             ))}
+            {((status === 'submitted' || status === 'streaming') && !messages.some(m => m.role === 'assistant')) ? (
+              <Message from={'assistant'}>
+                <MessageContent>
+                  <div className="flex items-center gap-2">
+                    <span className="h-2 w-2 rounded-full bg-foreground/70 animate-bounce [animation-delay:-0.2s]" />
+                    <span className="h-2 w-2 rounded-full bg-foreground/70 animate-bounce [animation-delay:-0.1s]" />
+                    <span className="h-2 w-2 rounded-full bg-foreground/70 animate-bounce" />
+                  </div>
+                </MessageContent>
+              </Message>
+            ) : null}
           </ConversationContent>
         </Conversation>
-      <ChatInput
-        models={models}
-        defaultModel={selectedModel}
-        placement="container"
-        maxWidthClass="max-w-4xl"
-        onSubmit={({ text, model, reasoningLevel }) => submit({ text, model, reasoningLevel })}
-      />
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 px-4">
+        <div className="pointer-events-auto mx-auto w-full max-w-4xl">
+          <ChatInput
+            models={models}
+            defaultModel={selectedModel}
+            placement="container"
+            maxWidthClass="max-w-4xl"
+            onSubmit={({ text, model, reasoningLevel }) => submit({ text, model, reasoningLevel })}
+          />
+        </div>
+      </div>
     </div>
   )
 }

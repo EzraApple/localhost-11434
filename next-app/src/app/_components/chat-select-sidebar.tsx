@@ -17,10 +17,11 @@ import {
   SidebarTrigger,
 } from '~/components/ui/sidebar'
 import { Button } from '~/components/ui/button'
-import { Search, X } from 'lucide-react'
+import { Pin, PinOff, Pencil, Search, X } from 'lucide-react'
 import { useChatStore, type ChatListItem } from '~/lib/chat-store'
-import { useState } from 'react'
+import { useMemo as _useMemoRef, useRef, useState } from 'react'
 import { Dialog, DialogContent, DialogTitle, DialogDescription, DialogFooter } from '../../components/ui/dialog'
+import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from '~/components/ui/context-menu'
 
 type Buckets = {
   Today: ChatListItem[]
@@ -49,19 +50,28 @@ function groupByDate(chats: ChatListItem[]): Buckets {
 
 export function ChatSelectSidebar() {
   const router = useRouter()
-  const { chats, selectedChatId, deleteChat } = useChatStore()
+  const { chats, selectedChatId, deleteChat, renameChat, pinChat } = useChatStore()
   const [confirmId, setConfirmId] = useState<string | null>(null)
   const [query, setQuery] = useState('')
+  const [renamingId, setRenamingId] = useState<string | null>(null)
+  const renameInputRef = useRef<HTMLInputElement | null>(null)
 
-  const sortedChats = useMemo(
-    () => [...chats].sort((a, b) => b.createdAt - a.createdAt),
+  const pinned = useMemo(() => chats.filter(c => c.pinned), [chats])
+  const unpinnedSorted = useMemo(
+    () => chats.filter(c => !c.pinned).sort((a, b) => b.createdAt - a.createdAt),
     [chats]
   )
+  const filteredPinned = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    if (!q) return pinned
+    return pinned.filter(c => c.title.toLowerCase().includes(q))
+  }, [query, pinned])
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
-    if (!q) return sortedChats
-    return sortedChats.filter(c => c.title.toLowerCase().includes(q))
-  }, [query, sortedChats])
+    if (!q) return unpinnedSorted
+    return unpinnedSorted.filter(c => c.title.toLowerCase().includes(q))
+  }, [query, unpinnedSorted])
   const groups = useMemo(() => groupByDate(filtered), [filtered])
 
   return (
@@ -99,12 +109,87 @@ export function ChatSelectSidebar() {
         <SidebarSeparator className="mx-3" />
       </SidebarHeader>
       <SidebarContent>
-        {sortedChats.length === 0 ? (
+        {chats.length === 0 ? (
           <div className="flex flex-1 items-center justify-center px-3">
             <div className="text-center text-sm text-muted-foreground">No chats yet</div>
           </div>
         ) : (
-          (['Today', 'Yesterday', 'Last 7 Days', 'Last 30 Days', 'Older'] as const).map(section => (
+          <>
+          {filteredPinned.length > 0 && (
+            <SidebarGroup>
+              <SidebarGroupLabel>Pinned</SidebarGroupLabel>
+              <SidebarGroupContent>
+                <SidebarMenu>
+                  {filteredPinned.map((chat) => (
+                    <SidebarMenuItem key={chat.id}>
+                      <ContextMenu>
+                        <ContextMenuTrigger asChild>
+                          <div className="w-full">
+                            <SidebarMenuButton
+                              className="group/chat w-full flex items-center justify-between"
+                              isActive={selectedChatId === chat.id}
+                              onClick={() => router.push(`/chat/${chat.id}`)}
+                              onDoubleClick={() => setRenamingId(chat.id)}
+                            >
+                              {renamingId === chat.id ? (
+                                <input
+                                  ref={renameInputRef}
+                                  className="w-full bg-transparent outline-none border-b border-border"
+                                  defaultValue={chat.title}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                      const value = (e.target as HTMLInputElement).value.trim()
+                                      if (value && value !== chat.title) renameChat(chat.id, value)
+                                      setRenamingId(null)
+                                    } else if (e.key === 'Escape') {
+                                      setRenamingId(null)
+                                    }
+                                  }}
+                                  onBlur={() => setRenamingId(null)}
+                                  autoFocus
+                                />
+                              ) : (
+                                <span className="truncate text-[#cde3df]">{chat.title}</span>
+                              )}
+                              <div className="flex items-center gap-1 opacity-0 translate-x-2 group-hover/chat:opacity-100 group-hover/chat:translate-x-0 transition-all duration-200">
+                                <span
+                                  role="button"
+                                  aria-label="Unpin chat"
+                                  className="rounded-md p-1 text-muted-foreground hover:text-foreground"
+                                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); pinChat(chat.id, false) }}
+                                  title="Unpin chat"
+                                >
+                                  <PinOff className="h-4 w-4" />
+                                </span>
+                                <span
+                                  role="button"
+                                  aria-label="Delete chat"
+                                  className="rounded-md p-1 text-muted-foreground hover:text-red-500"
+                                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); setConfirmId(chat.id) }}
+                                  title="Delete chat"
+                                >
+                                  <X className="h-4 w-4" />
+                                </span>
+                              </div>
+                            </SidebarMenuButton>
+                          </div>
+                        </ContextMenuTrigger>
+                        <ContextMenuContent>
+                          <ContextMenuItem onClick={() => setRenamingId(chat.id)}>
+                            <Pencil className="mr-2 h-4 w-4" /> Rename chat
+                          </ContextMenuItem>
+                          <ContextMenuItem onClick={() => pinChat(chat.id, false)}>
+                            <PinOff className="mr-2 h-4 w-4" /> Unpin chat
+                          </ContextMenuItem>
+                        </ContextMenuContent>
+                      </ContextMenu>
+                    </SidebarMenuItem>
+                  ))}
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+          )}
+          {( ['Today', 'Yesterday', 'Last 7 Days', 'Last 30 Days', 'Older'] as const).map(section => (
             groups[section].length ? (
               <SidebarGroup key={section}>
                 <SidebarGroupLabel>{section}</SidebarGroupLabel>
@@ -112,30 +197,75 @@ export function ChatSelectSidebar() {
                   <SidebarMenu>
                     {groups[section].map((chat) => (
                       <SidebarMenuItem key={chat.id}>
-                        <div className="w-full">
-                          <SidebarMenuButton
-                            className="w-full flex items-center justify-between"
-                            isActive={selectedChatId === chat.id}
-                            onClick={() => router.push(`/chat/${chat.id}`)}
-                          >
-                            <span className="truncate text-[#cde3df]">{chat.title}</span>
-                            <span
-                              role="button"
-                              aria-label="Delete chat"
-                              className="rounded-md p-1 text-muted-foreground hover:text-red-500"
-                              onClick={(e) => { e.preventDefault(); e.stopPropagation(); setConfirmId(chat.id) }}
-                            >
-                              <X className="h-4 w-4" />
-                            </span>
-                          </SidebarMenuButton>
-                        </div>
+                        <ContextMenu>
+                          <ContextMenuTrigger asChild>
+                            <div className="w-full">
+                              <SidebarMenuButton
+                                className="group/chat w-full flex items-center justify-between"
+                                isActive={selectedChatId === chat.id}
+                                onClick={() => router.push(`/chat/${chat.id}`)}
+                                onDoubleClick={() => setRenamingId(chat.id)}
+                              >
+                                {renamingId === chat.id ? (
+                                  <input
+                                    ref={renameInputRef}
+                                    className="w-full bg-transparent outline-none border-b border-border"
+                                    defaultValue={chat.title}
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter') {
+                                        const value = (e.target as HTMLInputElement).value.trim()
+                                        if (value && value !== chat.title) renameChat(chat.id, value)
+                                        setRenamingId(null)
+                                      } else if (e.key === 'Escape') {
+                                        setRenamingId(null)
+                                      }
+                                    }}
+                                    onBlur={() => setRenamingId(null)}
+                                    autoFocus
+                                  />
+                                ) : (
+                                  <span className="truncate text-[#cde3df]">{chat.title}</span>
+                                )}
+                                <div className="flex items-center gap-1 opacity-0 translate-x-2 group-hover/chat:opacity-100 group-hover/chat:translate-x-0 transition-all duration-200">
+                                  <span
+                                    role="button"
+                                    aria-label="Pin chat"
+                                    className="rounded-md p-1 text-muted-foreground hover:text-foreground"
+                                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); pinChat(chat.id, true) }}
+                                    title="Pin chat"
+                                  >
+                                    <Pin className="h-4 w-4" />
+                                  </span>
+                                  <span
+                                    role="button"
+                                    aria-label="Delete chat"
+                                    className="rounded-md p-1 text-muted-foreground hover:text-red-500"
+                                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); setConfirmId(chat.id) }}
+                                    title="Delete chat"
+                                  >
+                                    <X className="h-4 w-4" />
+                                  </span>
+                                </div>
+                              </SidebarMenuButton>
+                            </div>
+                          </ContextMenuTrigger>
+                          <ContextMenuContent>
+                            <ContextMenuItem onClick={() => setRenamingId(chat.id)}>
+                              <Pencil className="mr-2 h-4 w-4" /> Rename chat
+                            </ContextMenuItem>
+                            <ContextMenuItem onClick={() => pinChat(chat.id, true)}>
+                              <Pin className="mr-2 h-4 w-4" /> Pin chat
+                            </ContextMenuItem>
+                          </ContextMenuContent>
+                        </ContextMenu>
                       </SidebarMenuItem>
                     ))}
                   </SidebarMenu>
                 </SidebarGroupContent>
               </SidebarGroup>
             ) : null
-          ))
+          ))}
+          </>
         )}
       </SidebarContent>
       {/* <SidebarFooter>

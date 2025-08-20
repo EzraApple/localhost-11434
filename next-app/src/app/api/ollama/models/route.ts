@@ -25,7 +25,9 @@ export async function GET() {
     });
 
     if (!res.ok) {
-      return NextResponse.json({ models: [], error: `ollama tags failed: ${res.status}` });
+      const text = await res.text().catch(() => "");
+      const error = `Failed to list models from Ollama (HTTP ${res.status}). ${text ? `Details: ${text}` : ""}`.trim();
+      return NextResponse.json({ models: [], error, code: "OLLAMA_TAGS_HTTP_ERROR" }, { status: 502 });
     }
 
     const data: OllamaTagsResponse = await res.json();
@@ -40,7 +42,12 @@ export async function GET() {
 
     return NextResponse.json({ models });
   } catch (err: unknown) {
-    return NextResponse.json({ models: [], error: (err as Error).message });
+    const e = err as Error & { code?: string };
+    const isConnRefused = /ECONNREFUSED|fetch failed|ENOTFOUND|EHOSTUNREACH/i.test(String(e.message));
+    const error = isConnRefused
+      ? "Cannot connect to Ollama at 127.0.0.1:11434. Make sure Ollama is installed and running (ollama serve)."
+      : `Unexpected error contacting Ollama: ${e.message}`;
+    return NextResponse.json({ models: [], error, code: isConnRefused ? "OLLAMA_UNAVAILABLE" : "OLLAMA_UNKNOWN_ERROR" }, { status: 503 });
   }
 }
 

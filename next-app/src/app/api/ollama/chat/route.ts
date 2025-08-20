@@ -1,26 +1,87 @@
 import { NextResponse } from "next/server";
 import { Ollama } from "ollama";
+import { db } from "~/server/db";
+import { $Enums } from "@prisma/client";
 
 const client = new Ollama({ host: "http://127.0.0.1:11434" });
 
 export async function POST(req: Request) {
   try {
-    const { model, messages, think, reasoningLevel } = (await req.json()) as {
+    const { model, messages, think, reasoningLevel, chatId, assistantMessageId } = (await req.json()) as {
       model: string;
       messages: { role: "system" | "user" | "assistant" | "tool"; content: string }[];
       think?: boolean | "low" | "medium" | "high";
       reasoningLevel?: "low" | "medium" | "high";
+      chatId?: string;
+      assistantMessageId?: string;
     };
 
-    const stream = await client.chat({
-      model,
-      messages: messages.map((m) => ({ role: m.role, content: m.content })),
-      stream: true,
-      think: (reasoningLevel as any) ?? think ?? false,
-    });
+    let stream: AsyncIterable<any> | undefined;
+    try {
+      stream = await client.chat({
+        model,
+        messages: messages.map((m) => ({ role: m.role, content: m.content })),
+        stream: true,
+        think: (reasoningLevel as any) ?? think ?? false,
+      });
+    } catch (e: unknown) {
+      const err = e as Error;
+      const isConnRefused = /ECONNREFUSED|fetch failed|ENOTFOUND|EHOSTUNREACH/i.test(String(err.message));
+      const msg = isConnRefused
+        ? "Cannot connect to Ollama at 127.0.0.1:11434. Start Ollama (ollama serve) and ensure the host is reachable."
+        : `Failed to start chat stream: ${err.message}`;
+      return NextResponse.json({ error: msg, code: isConnRefused ? "OLLAMA_UNAVAILABLE" : "OLLAMA_CHAT_ERROR" }, { status: 503 });
+    }
 
     let finalReasoning = "";
     let finalText = "";
+
+    // Optional DB persistence setup for assistant message during stream
+    const shouldPersist = !!(chatId && assistantMessageId);
+    if (shouldPersist) {
+      try {
+        // ensure chat exists to satisfy FK
+        await db.chat.upsert({
+          where: { id: chatId as string },
+          update: {},
+          create: { id: chatId as string, title: "New Chat" },
+        });
+        await db.message.upsert({
+          where: { id: assistantMessageId as string },
+          update: {},
+          create: {
+            id: assistantMessageId as string,
+            chatId: chatId as string,
+            role: $Enums.MessageRole.ASSISTANT,
+            parts: [],
+          },
+        });
+      } catch (e) {
+        // eslint-disable-next-line no-console
+        console.warn("[ollama] failed to upsert assistant message start:", (e as Error).message);
+      }
+    }
+
+    let lastPersistAt = 0;
+    const minPersistIntervalMs = 250;
+    const persistAssistant = async () => {
+      if (!shouldPersist) return;
+      const now = Date.now();
+      if (now - lastPersistAt < minPersistIntervalMs) return;
+      lastPersistAt = now;
+      const parts: { type: "reasoning" | "text"; text: string }[] = [];
+      if (finalReasoning) parts.push({ type: "reasoning", text: finalReasoning });
+      if (finalText) parts.push({ type: "text", text: finalText });
+      try {
+        await db.message.update({
+          where: { id: assistantMessageId as string },
+          data: { parts: parts as unknown as object },
+        });
+      } catch (e) {
+        // eslint-disable-next-line no-console
+        console.warn("[ollama] failed to persist assistant message:", (e as Error).message);
+      }
+    };
 
     // Streaming math delimiter normalization state
     let inCodeFence = false; // ``` fence
@@ -120,8 +181,12 @@ export async function POST(req: Request) {
               const norm = normalizeMathDelimiters(content);
               controller.enqueue(encoder.encode(JSON.stringify({ kind: "text", text: norm }) + "\n"));
             }
+            // opportunistically persist assistant progress
+            await persistAssistant();
           }
         } catch (err) {
+          const message = `Streaming error: ${(err as Error).message}`;
+          controller.enqueue(new TextEncoder().encode(JSON.stringify({ kind: "error", error: message }) + "\n"));
           controller.error(err);
           return;
         }
@@ -130,6 +195,26 @@ export async function POST(req: Request) {
         const combined = (finalReasoning ? `[thinking]\n${finalReasoning}\n[/thinking]\n` : "") + finalText;
         // eslint-disable-next-line no-console
         console.log("[ollama] final assistant message:", combined);
+
+        // Final persistence and chat activity update
+        if (shouldPersist) {
+          try {
+            const parts: { type: "reasoning" | "text"; text: string }[] = [];
+            if (finalReasoning) parts.push({ type: "reasoning", text: finalReasoning });
+            if (finalText) parts.push({ type: "text", text: finalText });
+            await db.message.update({
+              where: { id: assistantMessageId as string },
+              data: { parts: parts as unknown as object },
+            });
+            await db.chat.update({
+              where: { id: chatId as string },
+              data: { lastMessageAt: new Date() },
+            });
+          } catch (e) {
+            // eslint-disable-next-line no-console
+            console.warn("[ollama] failed to finalize assistant message:", (e as Error).message);
+          }
+        }
 
         controller.enqueue(encoder.encode(JSON.stringify({ kind: "done" }) + "\n"));
         controller.close();
@@ -145,7 +230,12 @@ export async function POST(req: Request) {
       },
     });
   } catch (err: unknown) {
-    return NextResponse.json({ error: (err as Error).message }, { status: 500 });
+    const e = err as Error;
+    const isConnRefused = /ECONNREFUSED|fetch failed|ENOTFOUND|EHOSTUNREACH/i.test(String(e.message));
+    const msg = isConnRefused
+      ? "Cannot connect to Ollama at 127.0.0.1:11434. Start Ollama (ollama serve)."
+      : `Unexpected server error: ${e.message}`;
+    return NextResponse.json({ error: msg, code: isConnRefused ? "OLLAMA_UNAVAILABLE" : "SERVER_ERROR" }, { status: 500 });
   }
 }
 
