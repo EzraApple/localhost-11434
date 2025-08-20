@@ -16,7 +16,7 @@ export const Message = ({ className, from, ...props }: MessageProps) => (
     className={cn(
       'group flex w-full items-end justify-end gap-2 py-4',
       from === 'user' ? 'is-user' : 'is-assistant flex-row-reverse justify-end',
-      '[&>div]:max-w-[88%]',
+      '[&>div]:max-w-[88%] group-[.is-assistant]:[&>div]:max-w-full group-[.is-assistant]:[&>div]:w-full',
       className
     )}
     {...props}
@@ -33,8 +33,8 @@ export const MessageContent = ({
   <div
     className={cn(
       'flex flex-col gap-2 overflow-hidden rounded-lg px-4 py-3 text-foreground text-sm',
-      'group-[.is-user]:bg-primary group-[.is-user]:text-primary-foreground',
-      'group-[.is-assistant]:bg-neutral-900/60 group-[.is-assistant]:text-foreground group-[.is-assistant]:backdrop-blur-sm group-[.is-assistant]:border group-[.is-assistant]:border-white/5',
+      'group-[.is-user]:bg-[#132524cc] group-[.is-user]:text-[#e2e7e5] group-[.is-user]:border group-[.is-user]:border-[#2a403e]/60',
+      'group-[.is-assistant]:w-full group-[.is-assistant]:bg-background group-[.is-assistant]:text-foreground group-[.is-assistant]:backdrop-blur-0 group-[.is-assistant]:border-0 group-[.is-assistant]:overflow-visible',
       className
     )}
     {...props}

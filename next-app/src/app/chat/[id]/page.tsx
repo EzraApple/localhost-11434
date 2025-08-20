@@ -72,10 +72,10 @@ export default function ChatByIdPage() {
   }, [])
 
   return (
-    <div className="relative mx-auto min-h-dvh flex w-full max-w-4xl flex-1 flex-col gap-4 p-4 pb-40">
+    <div className="relative mx-auto min-h-dvh flex w-full max-w-4xl flex-1 flex-col gap-4 p-4 pb-0">
         {/* header strip now rendered in layout to avoid occlusion */}
         <Conversation>
-          <ConversationContent>
+          <ConversationContent className="pb-40">
             {messages.map((m) => (
               <Message key={m.id} from={m.role}>
                 <MessageContent>
@@ -98,7 +98,7 @@ export default function ChatByIdPage() {
       <ChatInput
         models={models}
         defaultModel={selectedModel}
-        placement="page"
+        placement="container"
         maxWidthClass="max-w-4xl"
         onSubmit={({ text, model, reasoningLevel }) => submit({ text, model, reasoningLevel })}
       />

@@ -25,12 +25,12 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en" className={`dark ${geist.variable}`}>
-      <body className="min-h-dvh bg-[#071315] text-neutral-100">
+      <body className="min-h-dvh bg-[#071315] text-neutral-100 overflow-hidden">
         <TRPCReactProvider>
           <ChatStoreProvider>
             <SidebarProvider>
               <ChatSelectSidebar />
-              <SidebarInset className="md:peer-data-[variant=inset]:shadow-sm md:peer-data-[variant=inset]:border md:peer-data-[variant=inset]:border-[#0b3f3a]">
+              <SidebarInset className="h-dvh overflow-y-auto md:peer-data-[variant=inset]:shadow-sm md:peer-data-[variant=inset]:border md:peer-data-[variant=inset]:border-[#0b3f3a]">
                 <div className="relative">
                   <div className="pointer-events-none absolute inset-0 -z-10">
                     <div className="absolute inset-0 opacity-40" style={{ backgroundImage: 'radial-gradient(closest-corner at 120px 36px, rgba(9, 83, 74, 0.22), rgba(9, 83, 74, 0.10)), linear-gradient(rgb(9, 18, 20) 15%, rgb(5, 10, 11))' }} />
@@ -38,8 +38,12 @@ export default function RootLayout({
                     <div className="absolute inset-0 bg-[#0a1616]/40" />
                   </div>
                   <div className="relative">
-                    <TopRightNotch />
-                    {children}
+                    <div className="sticky top-0 z-10 pointer-events-none">
+                      <TopRightNotch />
+                    </div>
+                    <div className="relative z-0">
+                      {children}
+                    </div>
                   </div>
                 </div>
               </SidebarInset>

@@ -68,8 +68,8 @@ export function ChatInput({ models, defaultModel, placeholder = 'Type your messa
           : "pointer-events-none absolute inset-x-0 bottom-0 z-40 px-4"
     }>
       <div className={`mx-auto w-full ${maxWidthClass}`}>
-        <div className="border border-[#0b3f3a]/40 rounded-t-[20px] bg-[#132524cc] backdrop-blur-lg shadow-[0_80px_50px_0_rgba(0,0,0,0.1),0_50px_30px_0_rgba(0,0,0,0.07),0_30px_15px_0_rgba(0,0,0,0.06),0_15px_8px_rgba(0,0,0,0.04),0_6px_4px_rgba(0,0,0,0.04),0_2px_2px_rgba(0,0,0,0.02)] p-2 pb-0 pointer-events-auto">
-          <PromptInput onSubmit={handleSubmit} className="mb-4 text-[#cfd6d4] bg-[#16302e]">
+        <div className="border border-[#0b3f3a]/40 rounded-t-[20px] bg-transparent backdrop-blur-lg shadow-[0_80px_50px_0_rgba(0,0,0,0.1),0_50px_30px_0_rgba(0,0,0,0.07),0_30px_15px_0_rgba(0,0,0,0.06),0_15px_8px_rgba(0,0,0,0.04),0_6px_4px_rgba(0,0,0,0.04),0_2px_2px_rgba(0,0,0,0.02)] p-2 pb-0 pointer-events-auto">
+          <PromptInput onSubmit={handleSubmit} className="mb-4 text-[#cfd6d4] bg-[#132524e6]">
             <PromptInputTextarea
               value={text}
               onChange={(e) => setText(e.target.value)}

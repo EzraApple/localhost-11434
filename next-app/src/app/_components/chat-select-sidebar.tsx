@@ -77,7 +77,7 @@ export function ChatSelectSidebar() {
         <div className="px-3 pb-2">
           <Button
             onClick={() => router.push('/')}
-            className="w-full"
+            className="w-full h-10 rounded-md font-semibold text-[#d3e6e2] backdrop-blur-md bg-[linear-gradient(180deg,rgba(19,49,45,0.72),rgba(14,31,29,0.72))] outline outline-1 outline-[#0b3f3a]/60 shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_8px_24px_rgba(0,0,0,0.35)] transition-colors hover:bg-[#0d5a4e] hover:bg-none"
             variant="secondary"
           >
             New Chat
@@ -138,11 +138,8 @@ export function ChatSelectSidebar() {
           ))
         )}
       </SidebarContent>
-      <SidebarFooter>
-        {sortedChats.length ? (
-          <div className="text-xs text-muted-foreground px-2">{`${sortedChats.length} chats`}</div>
-        ) : null}
-      </SidebarFooter>
+      {/* <SidebarFooter>
+      </SidebarFooter> */}
       <Dialog open={!!confirmId} onOpenChange={(open: boolean) => { if (!open) setConfirmId(null) }}>
         <DialogContent>
           <DialogTitle>Delete chat?</DialogTitle>

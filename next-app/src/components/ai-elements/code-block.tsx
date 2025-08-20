@@ -37,11 +37,18 @@ export const CodeBlock = ({
   <CodeBlockContext.Provider value={{ code }}>
     <div
       className={cn(
-        'relative w-full overflow-hidden rounded-md border bg-background text-foreground',
+        'relative w-full overflow-hidden rounded-lg border border-[#0b3f3a]/40 bg-[#0a1616] text-foreground',
         className
       )}
       {...props}
     >
+      {/* Header bar with language and copy */}
+      <div className="flex items-center justify-between border-b border-[#0b3f3a]/40 bg-[#132524] px-3 py-1.5 text-[11px] leading-none text-[#cfd6d4]">
+        <span className="uppercase tracking-wide opacity-80">{language}</span>
+        <div className="flex items-center gap-1">
+          <CodeBlockCopyButton className="size-6 text-[#cfd6d4] hover:bg-transparent" aria-label="Copy code" />
+        </div>
+      </div>
       <div className="relative">
         {/* @ts-expect-error - SyntaxHighlighter is not a valid JSX component */}
         <SyntaxHighlighter
@@ -53,7 +60,7 @@ export const CodeBlock = ({
             margin: 0,
             padding: '1rem',
             fontSize: '0.875rem',
-            background: 'hsl(var(--background))',
+            background: 'transparent',
             color: 'hsl(var(--foreground))',
           }}
           language={language}
@@ -77,7 +84,7 @@ export const CodeBlock = ({
             margin: 0,
             padding: '1rem',
             fontSize: '0.875rem',
-            background: 'hsl(var(--background))',
+            background: 'transparent',
             color: 'hsl(var(--foreground))',
           }}
           language={language}
