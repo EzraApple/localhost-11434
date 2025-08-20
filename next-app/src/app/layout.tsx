@@ -6,6 +6,8 @@ import { Geist } from "next/font/google";
 import { TRPCReactProvider } from "~/trpc/react";
 import { SidebarInset, SidebarProvider } from "~/components/ui/sidebar";
 import { ChatSelectSidebar } from "./_components/chat-select-sidebar";
+import { ChatStoreProvider } from "~/lib/chat-store";
+import TopRightNotch from "./_components/top-right-notch";
 
 export const metadata: Metadata = {
   title: "Create T3 App",
@@ -22,13 +24,27 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en" className={`${geist.variable}`}>
-      <body className="min-h-dvh bg-neutral-950 text-neutral-100">
+    <html lang="en" className={`dark ${geist.variable}`}>
+      <body className="min-h-dvh bg-[#071315] text-neutral-100">
         <TRPCReactProvider>
-          <SidebarProvider>
-            <ChatSelectSidebar />
-            <SidebarInset>{children}</SidebarInset>
-          </SidebarProvider>
+          <ChatStoreProvider>
+            <SidebarProvider>
+              <ChatSelectSidebar />
+              <SidebarInset className="md:peer-data-[variant=inset]:shadow-sm md:peer-data-[variant=inset]:border md:peer-data-[variant=inset]:border-[#0b3f3a]">
+                <div className="relative">
+                  <div className="pointer-events-none absolute inset-0 -z-10">
+                    <div className="absolute inset-0 opacity-40" style={{ backgroundImage: 'radial-gradient(closest-corner at 120px 36px, rgba(9, 83, 74, 0.22), rgba(9, 83, 74, 0.10)), linear-gradient(rgb(9, 18, 20) 15%, rgb(5, 10, 11))' }} />
+                    <div className="absolute inset-0 bg-noise" />
+                    <div className="absolute inset-0 bg-[#0a1616]/40" />
+                  </div>
+                  <div className="relative">
+                    <TopRightNotch />
+                    {children}
+                  </div>
+                </div>
+              </SidebarInset>
+            </SidebarProvider>
+          </ChatStoreProvider>
         </TRPCReactProvider>
       </body>
     </html>

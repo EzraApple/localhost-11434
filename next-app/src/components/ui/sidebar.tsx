@@ -27,7 +27,7 @@ import {
 
 const SIDEBAR_COOKIE_NAME = "sidebar_state"
 const SIDEBAR_COOKIE_MAX_AGE = 60 * 60 * 24 * 7
-const SIDEBAR_WIDTH = "16rem"
+const SIDEBAR_WIDTH = "19.2rem"
 const SIDEBAR_WIDTH_MOBILE = "18rem"
 const SIDEBAR_WIDTH_ICON = "3rem"
 const SIDEBAR_KEYBOARD_SHORTCUT = "b"
@@ -310,7 +310,8 @@ function SidebarInset({ className, ...props }: React.ComponentProps<"main">) {
       data-slot="sidebar-inset"
       className={cn(
         "bg-background relative flex w-full flex-1 flex-col",
-        "md:peer-data-[variant=inset]:m-2 md:peer-data-[variant=inset]:ml-0 md:peer-data-[variant=inset]:rounded-xl md:peer-data-[variant=inset]:shadow-sm md:peer-data-[variant=inset]:peer-data-[state=collapsed]:ml-2",
+        // Remove right inset and square the top-right & bottom corners while keeping top-left rounded
+        "md:peer-data-[variant=inset]:mt-3 md:peer-data-[variant=inset]:ml-2 md:peer-data-[variant=inset]:mr-0 md:peer-data-[variant=inset]:rounded-tl-xl md:peer-data-[variant=inset]:rounded-tr-none md:peer-data-[variant=inset]:rounded-b-none md:peer-data-[variant=inset]:shadow-sm",
         className
       )}
       {...props}

@@ -137,7 +137,9 @@ export const ReasoningTrigger = memo(
           <>
             <BrainIcon className="size-4" />
             {isStreaming || duration === 0 ? (
-              <p>Thinking...</p>
+              <p className="bg-gradient-to-r from-neutral-400 via-neutral-200 to-neutral-400 bg-clip-text text-transparent [background-size:200%_100%] animate-[shimmer_1.5s_linear_infinite]">
+                Thinking...
+              </p>
             ) : (
               <p>Thought for {duration} seconds</p>
             )}
