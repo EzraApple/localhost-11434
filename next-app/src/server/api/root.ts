@@ -1,4 +1,4 @@
-import { ollamaRouter } from "~/server/api/routers/ollama";
+import { modelsRouter } from "~/server/api/routers/models";
 import { chatsRouter } from "~/server/api/routers/chats";
 import { messagesRouter } from "~/server/api/routers/messages";
 import { createCallerFactory, createTRPCRouter } from "~/server/api/trpc";
@@ -9,7 +9,7 @@ import { createCallerFactory, createTRPCRouter } from "~/server/api/trpc";
  * All routers added in /api/routers should be manually added here.
  */
 export const appRouter = createTRPCRouter({
-  ollama: ollamaRouter,
+  models: modelsRouter,
   chats: chatsRouter,
   messages: messagesRouter,
 });

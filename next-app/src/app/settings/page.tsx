@@ -4,6 +4,9 @@ import { useRouter } from "next/navigation"
 import * as React from "react"
 import { ArrowLeft } from "lucide-react"
 import { Button } from "~/components/ui/button"
+import dynamic from 'next/dynamic'
+
+const ModelsTab = dynamic(() => import('./components/models/models-tab'), { ssr: false })
 
 export default function SettingsPage() {
   const router = useRouter()
@@ -105,6 +108,14 @@ export default function SettingsPage() {
             {activeTab === "knowledge-base" && "Knowledge Base"}
           </h1>
         </div>
+
+        {activeTab === 'models' ? (
+          <div className="mt-6 flex w-full justify-center">
+            <div className="w-full max-w-4xl px-4">
+              <ModelsTab />
+            </div>
+          </div>
+        ) : null}
       </div>
     </div>
   )

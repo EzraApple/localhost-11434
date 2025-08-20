@@ -20,7 +20,7 @@ export default function ChatByIdPage() {
   const params = useParams<{ id: string }>()
   const id = params?.id
   const search = useSearchParams()
-  const { data, error } = api.ollama.listModels.useQuery()
+  const { data, error } = api.models.list.useQuery()
   const models: ModelInfo[] = data?.models ?? []
   const [selectedModel, setSelectedModel] = useState('')
   const { renameChat, selectChat, selectedModel: storeModel, chats } = useChatStore()

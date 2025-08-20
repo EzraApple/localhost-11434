@@ -12,7 +12,7 @@ type ModelInfo = { name: string }
 export default function Home() {
   const router = useRouter()
   const { createChat, selectChat, selectedModel: storedModel, setSelectedModel } = useChatStore()
-  const { data, error } = api.ollama.listModels.useQuery()
+  const { data, error } = api.models.list.useQuery()
   const models: ModelInfo[] = data?.models ?? []
   const [selectedModel, setSelectedModelState] = useState(storedModel ?? '')
   useEffect(() => {
