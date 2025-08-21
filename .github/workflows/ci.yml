@@ -45,6 +45,7 @@ jobs:
     - name: Setup database
       run: |
         cd next-app
+        echo "DATABASE_URL=file:./dev.db" >> .env
         pnpm db:generate
 
     - name: Run type checking
