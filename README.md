@@ -4,7 +4,7 @@ A T3 Chat-inspired chat application for your local Ollama models. Ollama Desk pr
 
 ## What is Ollama Chat?
 
-Ollama Desk is a desktop chat application built with the T3 Stack that connects to your local Ollama instance. It's designed for users who want to chat with AI models while maintaining privacy and control over their data - everything runs locally on your machine.
+Ollama Chat is a desktop chat application built with the T3 Stack that connects to your local Ollama instance. It's designed for users who want to chat with AI models while maintaining privacy and control over their data - everything runs locally on your machine.
 
 ### Current Features
 
