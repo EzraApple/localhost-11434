@@ -1,8 +1,8 @@
-# Ollama Desk
+# Ollama Chat
 
 A T3 Chat-inspired chat application for your local Ollama models. Ollama Desk provides a clean, modern interface for interacting with AI models that run entirely on your laptop, with a focus on real functionality and beautiful design.
 
-## What is Ollama Desk?
+## What is Ollama Chat?
 
 Ollama Desk is a desktop chat application built with the T3 Stack that connects to your local Ollama instance. It's designed for users who want to chat with AI models while maintaining privacy and control over their data - everything runs locally on your machine.
 
@@ -24,7 +24,7 @@ Ollama Desk is a desktop chat application built with the T3 Stack that connects 
 
 ## Prerequisites
 
-Before running Ollama Desk, you'll need:
+Before running Ollama Chat, you'll need:
 
 - **Node.js 18+** and **pnpm** (recommended) or npm
 - **Ollama** installed and running locally
@@ -107,7 +107,7 @@ The web app will be available at `http://localhost:3000`, and the Electron app w
 ## Project Structure
 
 ```
-ollama-desk/
+ollama-chat/
 ├── electron/          # Desktop application
 ├── next-app/          # Web application
 │   ├── src/
@@ -164,19 +164,7 @@ For build problems:
 2. Ensure you're using the correct Node.js version
 3. Check that all dependencies are properly installed
 
-## Contributing
-
-This project is built with the T3 Stack and follows its conventions. When contributing:
-
-1. Follow the existing code style and patterns
-2. Use TypeScript for all new code
-3. Test your changes locally before submitting
-4. Ensure the database schema is updated if needed
 
 ## License
 
 MIT License - see [LICENSE](LICENSE) file for details.
-
----
-
-Built with the [T3 Stack](https://create.t3.gg/) - a full-stack, type-safe, web development framework.
