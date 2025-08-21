@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState, type FormEventHandler } from 'react'
+import { useEffect, useMemo, useRef, useState, type FormEventHandler } from 'react'
 import { Brain } from 'lucide-react'
 import {
   PromptInput,
@@ -30,14 +30,21 @@ export type ChatInputProps = {
   prefillText?: string
   onSubmit?: (payload: { text: string; model: string; reasoningLevel: 'low' | 'medium' | 'high'; systemPromptContent?: string; systemPromptId?: string | 'none' }) => void
   onStop?: () => void
+  onTypingStart?: () => void
+  onTypingStop?: () => void
+  autoClear?: boolean
+  initialAutoSubmit?: boolean
   status?: ChatStatus
   placement?: 'viewport' | 'container' | 'page'
   maxWidthClass?: string
 }
 
-export function ChatInput({ models, defaultModel, chatId, defaultSystemPromptId, placeholder = 'Type your message…', prefillText, onSubmit, onStop, status: externalStatus, placement = 'viewport', maxWidthClass = 'max-w-3xl' }: ChatInputProps) {
+export function ChatInput({ models, defaultModel, chatId, defaultSystemPromptId, placeholder = 'Type your message…', prefillText, onSubmit, onStop, onTypingStart, onTypingStop, autoClear = true, initialAutoSubmit = false, status: externalStatus, placement = 'viewport', maxWidthClass = 'max-w-3xl' }: ChatInputProps) {
   const [text, setText] = useState('')
   const [model, setModel] = useState('')
+  const hasCalledTypingStart = useRef(false)
+  const isTextFromPrefill = useRef(false)
+  const isInitialAutoSubmit = useRef(initialAutoSubmit)
   const status = externalStatus ?? 'ready'
   const [reasoningLevel, setReasoningLevel] = useState<'low' | 'medium' | 'high'>('high')
   const { data: caps, error: capsError, thinkLevels } = useOllamaModelCapabilities(model)
@@ -79,7 +86,10 @@ export function ChatInput({ models, defaultModel, chatId, defaultSystemPromptId,
 
   // apply prefill text when provided
   useEffect(() => {
-    if (typeof prefillText === 'string') setText(prefillText)
+    if (typeof prefillText === 'string') {
+      setText(prefillText)
+      isTextFromPrefill.current = true
+    }
   }, [prefillText])
 
   // adjust reasoning level to a supported one when model changes
@@ -121,11 +131,11 @@ export function ChatInput({ models, defaultModel, chatId, defaultSystemPromptId,
   useEffect(() => {
     if (status === 'streaming') {
       setShouldClearText(true)
-    } else if (status === 'ready' && shouldClearText) {
+    } else if (status === 'ready' && shouldClearText && autoClear && !isInitialAutoSubmit.current) {
       setText('')
       setShouldClearText(false)
     }
-  }, [status, shouldClearText])
+  }, [status, shouldClearText, autoClear])
 
   return (
     <div className={
@@ -140,7 +150,24 @@ export function ChatInput({ models, defaultModel, chatId, defaultSystemPromptId,
           <PromptInput onSubmit={handleSubmit} className="mb-4 text-[#cfd6d4] bg-[#132524f0]">
             <PromptInputTextarea
               value={text}
-              onChange={(e) => setText(e.target.value)}
+              onChange={(e) => {
+                setText(e.target.value)
+                // Call onTypingStart when user starts typing (from empty to non-empty)
+                // But not if the text was set via prefill
+                if (!text && e.target.value && onTypingStart && !hasCalledTypingStart.current && !isTextFromPrefill.current) {
+                  hasCalledTypingStart.current = true
+                  onTypingStart()
+                }
+                // Call onTypingStop when user deletes all text (from non-empty to empty)
+                if (text && !e.target.value && onTypingStop && hasCalledTypingStart.current) {
+                  hasCalledTypingStart.current = false
+                  onTypingStop()
+                }
+                // Reset prefill flag when user starts modifying the text
+                if (isTextFromPrefill.current && e.target.value !== prefillText) {
+                  isTextFromPrefill.current = false
+                }
+              }}
               placeholder={placeholder}
             />
             <PromptInputToolbar>

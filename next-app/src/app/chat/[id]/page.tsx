@@ -23,7 +23,7 @@ export default function ChatByIdPage() {
   const { data, error } = api.models.list.useQuery()
   const models: ModelInfo[] = data?.models ?? []
   const [selectedModel, setSelectedModel] = useState('')
-  const { renameChat, selectChat, selectedModel: storeModel, chats } = useChatStore()
+  const { renameChat, selectChat, setLastSetPrompt, selectedModel: storeModel, chats } = useChatStore()
   
   // Initialize model selection for the current chat
   useEffect(() => {
@@ -122,7 +122,15 @@ export default function ChatByIdPage() {
           setModelMutation.mutate({ id: chatIdStr, model })
         }
       } catch {}
-      submit({ text: first, model, systemPromptContent: sys ?? undefined })
+      // Small delay to ensure component has mounted and UI is ready
+      setTimeout(() => {
+        submit({ text: first, model, systemPromptContent: sys ?? undefined })
+      }, 100)
+      // Update chat store with the selected system prompt
+      if (sysId && sysId !== 'none') {
+        setLastSetPrompt(String(id), sysId)
+      }
+
       // Persist per-chat selected system prompt id to localStorage for selector default
       try {
         const val = sysId ?? (sys ? 'custom' : 'none')
@@ -243,6 +251,8 @@ export default function ChatByIdPage() {
             placement="container"
             maxWidthClass="max-w-4xl"
             status={status}
+            autoClear={false}
+            initialAutoSubmit={true}
             onStop={abort}
             onSubmit={({ text, model, reasoningLevel, systemPromptContent, systemPromptId }) => {
               // Update selected model locally

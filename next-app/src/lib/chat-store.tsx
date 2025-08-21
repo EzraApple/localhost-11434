@@ -18,6 +18,7 @@ type ChatStore = {
   createChat: (id: string, title?: string, model?: string) => void
   renameChat: (id: string, title: string) => void
   pinChat: (id: string, pinned: boolean) => void
+  setLastSetPrompt: (id: string, promptId: string | null) => void
   selectChat: (id: string | null) => void
   selectedModel: string | null
   setSelectedModel: (model: string) => void
@@ -79,6 +80,10 @@ export function ChatStoreProvider({ children }: { children: React.ReactNode }) {
     })
   }, [chats, pinChatMutation])
 
+  const setLastSetPrompt = useCallback((id: string, promptId: string | null) => {
+    setChats(prev => prev.map(c => (c.id === id ? { ...c, lastSetPrompt: promptId } : c)))
+  }, [])
+
   const selectChat = useCallback((id: string | null) => {
     setSelectedChatId(id)
   }, [])
@@ -120,11 +125,12 @@ export function ChatStoreProvider({ children }: { children: React.ReactNode }) {
     createChat,
     renameChat,
     pinChat,
+    setLastSetPrompt,
     selectChat,
     selectedModel,
     setSelectedModel,
     deleteChat,
-  }), [chats, selectedChatId, createChat, renameChat, pinChat, selectChat, selectedModel, setSelectedModel, deleteChat])
+  }), [chats, selectedChatId, createChat, renameChat, pinChat, setLastSetPrompt, selectChat, selectedModel, setSelectedModel, deleteChat])
 
   return <ChatStoreContext.Provider value={storeValue}>{children}</ChatStoreContext.Provider>
 }

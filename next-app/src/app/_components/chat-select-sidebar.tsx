@@ -22,6 +22,7 @@ import { useChatStore, type ChatListItem } from '~/lib/chat-store'
 import { useMemo as _useMemoRef, useRef, useState } from 'react'
 import { Dialog, DialogContent, DialogTitle, DialogDescription, DialogFooter } from '../../components/ui/dialog'
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from '~/components/ui/context-menu'
+import { api } from '~/trpc/react'
 
 type Buckets = {
   Today: ChatListItem[]
@@ -51,6 +52,10 @@ function groupByDate(chats: ChatListItem[]): Buckets {
 export function ChatSelectSidebar() {
   const router = useRouter()
   const { chats, selectedChatId, deleteChat, renameChat, pinChat } = useChatStore()
+  const { isLoading: isLoadingChats } = api.chats.list.useQuery(undefined, {
+    refetchOnWindowFocus: false,
+    staleTime: 5_000
+  })
   const [confirmId, setConfirmId] = useState<string | null>(null)
   const [query, setQuery] = useState('')
   const [renamingId, setRenamingId] = useState<string | null>(null)
@@ -109,7 +114,11 @@ export function ChatSelectSidebar() {
         <SidebarSeparator className="mx-3" />
       </SidebarHeader>
       <SidebarContent>
-        {chats.length === 0 ? (
+        {isLoadingChats ? (
+          <div className="flex flex-1 items-center justify-center px-3">
+            <div className="animate-spin rounded-full h-6 w-6 border-2 border-muted-foreground border-t-transparent" />
+          </div>
+        ) : chats.length === 0 ? (
           <div className="flex flex-1 items-center justify-center px-3">
             <div className="text-center text-sm text-muted-foreground">No chats yet</div>
           </div>

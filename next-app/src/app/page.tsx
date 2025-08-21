@@ -6,6 +6,7 @@ import { api } from '~/trpc/react'
 import { toast } from 'sonner'
 import { useChatStore } from '~/lib/chat-store'
 import ChatInput from '~/components/chat-input'
+import { Loader2 } from 'lucide-react'
 
 type ModelInfo = { name: string }
 
@@ -15,6 +16,8 @@ export default function Home() {
   const { data, error } = api.models.list.useQuery()
   const models: ModelInfo[] = data?.models ?? []
   const [selectedModel, setSelectedModelState] = useState(storedModel ?? '')
+  const [isNavigating, setIsNavigating] = useState(false)
+
   useEffect(() => {
     if (models.length && !selectedModel) {
       const m = storedModel ?? models[0]!.name
@@ -38,6 +41,7 @@ export default function Home() {
   ]
 
   const [prefill, setPrefill] = useState<string>('')
+  const [isUserTyping, setIsUserTyping] = useState(false)
 
   return (
     <div className="relative min-h-dvh pb-40">
@@ -46,20 +50,34 @@ export default function Home() {
         <div className="absolute inset-0 bg-noise" />
         <div className="absolute inset-0 bg-[#0a1616]/30" />
       </div>
-      <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-4 pt-[calc(max(15vh,2.5rem))]">
-        <h2 className="text-3xl font-semibold">How can I help you?</h2>
-        <div className="flex flex-row flex-wrap gap-2.5 text-sm">
-          {basePrompts.map((p) => (
-            <button
-              key={p}
-              className="h-9 rounded-full px-5 py-2 font-semibold outline outline-1 outline-[#113936]/50 bg-[#113936]/15 text-[#d3e6e2] hover:bg-[#113936]/25"
-              type="button"
-              onClick={() => setPrefill(p)}
-            >
-              {p}
-            </button>
-          ))}
+
+      {/* Loading overlay */}
+      {isNavigating && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20 backdrop-blur-sm">
+          <div className="flex flex-col items-center gap-4 rounded-lg bg-[#0a1616]/90 p-6 border border-[#113936]/40">
+            <Loader2 className="h-8 w-8 animate-spin text-[#d3e6e2]" />
+            <p className="text-sm text-[#d3e6e2]">Creating your chat...</p>
+          </div>
         </div>
+      )}
+      <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-4 pt-[calc(max(15vh,2.5rem))]">
+        {!isUserTyping && (
+          <>
+            <h2 className="text-3xl font-semibold transition-opacity duration-300 ease-out">How can I help you?</h2>
+            <div className="flex flex-row flex-wrap gap-2.5 text-sm transition-opacity duration-300 ease-out">
+              {basePrompts.map((p) => (
+                <button
+                  key={p}
+                  className="h-9 rounded-full px-5 py-2 font-semibold outline outline-1 outline-[#113936]/50 bg-[#113936]/15 text-[#d3e6e2] hover:bg-[#113936]/25 transition-all duration-300 ease-out"
+                  type="button"
+                  onClick={() => setPrefill(p)}
+                >
+                  {p}
+                </button>
+              ))}
+            </div>
+          </>
+        )}
       </div>
       <ChatInput
         models={models}
@@ -67,13 +85,31 @@ export default function Home() {
         prefillText={prefill}
         placement="page"
         maxWidthClass="max-w-3xl"
-        onSubmit={({ text, model, systemPromptContent, systemPromptId }) => {
+        onTypingStart={() => setIsUserTyping(true)}
+        onTypingStop={() => setIsUserTyping(false)}
+        onSubmit={async ({ text, model, systemPromptContent, systemPromptId }) => {
+          setIsNavigating(true)
           const id = crypto.randomUUID()
+
+          // Create and select chat immediately
           createChat(id, 'New Chat', model)
           selectChat(id)
           setSelectedModel(model)
-          // store initial prompt in sessionStorage to avoid URL params
-          try { sessionStorage.setItem(`chat:${id}:initial`, JSON.stringify({ q: text, m: model, s: systemPromptContent ?? null, sid: systemPromptId ?? null })) } catch {}
+
+          // Store initial prompt in sessionStorage
+          try {
+            sessionStorage.setItem(`chat:${id}:initial`, JSON.stringify({
+              q: text,
+              m: model,
+              s: systemPromptContent ?? null,
+              sid: systemPromptId ?? null
+            }))
+          } catch {}
+
+          // Small delay to ensure chat is properly created before navigation
+          await new Promise(resolve => setTimeout(resolve, 50))
+
+          // Navigate to chat page
           router.push(`/chat/${id}`)
         }}
       />

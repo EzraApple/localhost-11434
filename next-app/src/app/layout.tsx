@@ -1,7 +1,15 @@
 import "~/styles/globals.css";
+import "@fontsource/inter/400.css";
+import "@fontsource/inter/500.css";
+import "@fontsource/inter/700.css";
 
 import { type Metadata } from "next";
-import { Geist } from "next/font/google";
+import { Inter } from "next/font/google";
+
+export const inter = Inter({
+  subsets: ["latin"],
+  variable: "--font-inter",
+});
 
 import { TRPCReactProvider } from "~/trpc/react";
 import { ChatStoreProvider } from "~/lib/chat-store";
@@ -14,16 +22,11 @@ export const metadata: Metadata = {
   icons: [{ rel: "icon", url: "/favicon.ico" }],
 };
 
-const geist = Geist({
-  subsets: ["latin"],
-  variable: "--font-geist-sans",
-});
-
 export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en" className={`dark ${geist.variable}`}>
+    <html lang="en" className={`dark ${inter.variable}`}>
       <body className="min-h-dvh bg-[#071315] text-neutral-100 overflow-hidden">
         <TRPCReactProvider>
           <ChatStoreProvider>

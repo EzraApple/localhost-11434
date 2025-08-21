@@ -87,17 +87,22 @@ export function useOllamaChat(chatId: string) {
   const submit = useCallback(
     async ({ text, model, reasoningLevel, systemPromptContent }: { text: string; model: string; reasoningLevel?: 'low' | 'medium' | 'high'; systemPromptContent?: string }) => {
       if (!text.trim()) return
-      appendUser(text)
-      // persist user message to DB (fire-and-forget to avoid UI lag)
-      createMessageMutation.mutate(
-        { chatId, role: 'USER', parts: [{ type: 'text', text }] } as any,
-        {
-          onError: (e) => {
-            // eslint-disable-next-line no-console
-            console.warn('[chat] failed to persist user message:', (e as Error).message)
-          },
-        }
-      )
+
+      // Check if this exact message already exists in the current messages
+      const existingMessage = messages.find(m => m.role === 'user' && m.parts[0]?.text === text)
+      if (!existingMessage) {
+        appendUser(text)
+        // persist user message to DB (fire-and-forget to avoid UI lag)
+        createMessageMutation.mutate(
+          { chatId, role: 'USER', parts: [{ type: 'text', text }] } as any,
+          {
+            onError: (e) => {
+              // eslint-disable-next-line no-console
+              console.warn('[chat] failed to persist user message:', e?.message || 'Unknown error')
+            },
+          }
+        )
+      }
       setStatus('submitted')
       setStreamPhase('reasoning')
       // create an assistant message id upfront
@@ -230,7 +235,7 @@ export function useOllamaChat(chatId: string) {
         abortRef.current = null
       }
     },
-    [appendUser, chatId, streamPhase, createMessageMutation]
+    [appendUser, chatId, streamPhase, createMessageMutation, messages]
   )
 
   const deleteAfterMessageMutation = api.messages.deleteAfterMessage.useMutation()
@@ -265,7 +270,7 @@ export function useOllamaChat(chatId: string) {
               resolve()
             },
             onError: (e) => {
-              console.warn('[chat] failed to delete messages after edit:', (e as Error).message)
+              console.warn('[chat] failed to delete messages after edit:', e?.message || 'Unknown error')
               reject(e)
             },
           }
@@ -287,7 +292,7 @@ export function useOllamaChat(chatId: string) {
               resolve()
             },
             onError: (e) => {
-              console.warn('[chat] failed to persist edited message:', (e as Error).message)
+              console.warn('[chat] failed to persist edited message:', e?.message || 'Unknown error')
               reject(e)
             },
           }
@@ -337,7 +342,7 @@ export function useOllamaChat(chatId: string) {
               resolve()
             },
             onError: (e) => {
-              console.warn('[chat] failed to delete messages after retry:', (e as Error).message)
+              console.warn('[chat] failed to delete messages after retry:', e?.message || 'Unknown error')
               reject(e)
             },
           }

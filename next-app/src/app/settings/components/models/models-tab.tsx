@@ -169,8 +169,8 @@ function ModelRow({ name, meta, size, pendingPercent, onRemoved, isPulling }: { 
         if (Number.isFinite(parsed) && parsed > 0) n = parsed
       }
     }
-    if (Number.isFinite(n) && n > 0) {
-      const k = Math.round((n as number) / 100) / 10
+    if (n !== undefined && Number.isFinite(n) && n > 0) {
+      const k = Math.round(n / 100) / 10
       return `${k}k tokens`
     }
     return '—'

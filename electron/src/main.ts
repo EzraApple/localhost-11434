@@ -7,8 +7,8 @@ function getDevServerURL(): string {
 
 async function createWindow(): Promise<void> {
   const win = new BrowserWindow({
-    width: 1800,
-    height: 1200,
+    width: 2240,
+    height: 1400,
     webPreferences: {
       contextIsolation: true,
       sandbox: true,
