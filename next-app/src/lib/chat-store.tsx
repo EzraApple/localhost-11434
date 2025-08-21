@@ -9,6 +9,7 @@ export type ChatListItem = {
   createdAt: number
   pinned?: boolean
   lastSetModel?: string | null
+  lastSetPrompt?: string | null
 }
 
 type ChatStore = {
@@ -32,20 +33,20 @@ export function ChatStoreProvider({ children }: { children: React.ReactNode }) {
 
   // hydrate chats from server
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { data: chatsData } = api.chats.list.useQuery(undefined, { refetchOnWindowFocus: false })
+  const { data: chatsData } = api.chats.list.useQuery(undefined, { refetchOnWindowFocus: false, staleTime: 5_000 })
   import('react').then(({ useEffect }) => {
     // TS appeasement for hook placement; actual effect below
   })
   // eslint-disable-next-line @typescript-eslint/no-var-requires
   require('react').useEffect(() => {
     if (chatsData?.chats) {
-      setChats(chatsData.chats.map(c => ({ id: c.id, title: c.title, createdAt: new Date(c.createdAt as any).getTime(), pinned: !!c.pinned, lastSetModel: (c as any).lastSetModel ?? null })))
+      setChats(chatsData.chats.map(c => ({ id: c.id, title: c.title, createdAt: new Date(c.createdAt as any).getTime(), pinned: !!c.pinned, lastSetModel: (c as any).lastSetModel ?? null, lastSetPrompt: (c as any).lastSetPrompt ?? null })))
     }
   }, [chatsData?.chats])
 
   const createChatMutation = api.chats.create.useMutation()
   const createChat = useCallback((id: string, title = 'New Chat', model?: string) => {
-    setChats(prev => [{ id, title, createdAt: Date.now() }, ...prev])
+    setChats(prev => [{ id, title, createdAt: Date.now(), lastSetModel: model || null, lastSetPrompt: null }, ...prev])
     setSelectedChatId(id)
     // fire-and-forget server create
     createChatMutation.mutate({ id, title, model } as any, {

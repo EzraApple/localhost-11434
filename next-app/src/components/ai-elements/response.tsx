@@ -21,6 +21,10 @@ export const Response = memo(
       code({ inline, className, children, ...codeProps }: { inline?: boolean; className?: string; children?: ReactNode } & HTMLAttributes<HTMLElement>) {
         const languageMatch = /language-(\w+)/.exec(className ?? '')
         const codeString = String(children ?? '')
+        
+        // Check if this looks like ASCII art or a file structure (multiline with special chars)
+        const isAsciiArt = codeString.includes('\n') && /[├─│└┌┐┘┌┴┬┤┼╭╮╰╯║═╔╗╚╝╠╣╦╩╬\+\-\|\\\/]/.test(codeString)
+        
         if (!inline && languageMatch) {
           return (
             <CodeBlock
@@ -30,6 +34,31 @@ export const Response = memo(
             />
           )
         }
+        
+        // For ASCII art, use a simple pre element without the full code block styling
+        if (!inline && isAsciiArt) {
+          return (
+            <pre className="my-3 whitespace-pre overflow-x-auto text-sm text-[#d6dbd9] font-mono bg-transparent">
+              {codeString}
+            </pre>
+          )
+        }
+        
+        // For inline code that might be ASCII art, preserve whitespace
+        if (inline && isAsciiArt) {
+          return (
+            <code
+              className={cn(
+                'rounded-md bg-[#132827]/60 px-1.5 py-0.5 text-[#d6dbd9] shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] whitespace-pre font-mono',
+                className
+              )}
+              {...codeProps as any}
+            >
+              {children}
+            </code>
+          )
+        }
+        
         return (
           <code
             className={cn(
@@ -51,7 +80,11 @@ export const Response = memo(
         )
       },
       pre({ children }: { children?: ReactNode }) {
-        return <div className="my-3">{children}</div>
+        return (
+          <pre className="my-3 whitespace-pre-wrap overflow-x-auto rounded-lg bg-[#0a1515] border border-[#113936]/40 p-4 text-sm text-[#d6dbd9] font-mono">
+            {children}
+          </pre>
+        )
       },
       ...(userComponents ?? {}),
     }), [userComponents])

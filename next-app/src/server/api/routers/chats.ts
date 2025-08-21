@@ -4,7 +4,7 @@ import { createTRPCRouter, publicProcedure } from "~/server/api/trpc";
 export const chatsRouter = createTRPCRouter({
   list: publicProcedure.input(z.void()).query(async ({ ctx }) => {
     const chats = await ctx.db.chat.findMany({
-      select: { id: true, title: true, model: true, lastSetModel: true, createdAt: true, lastMessageAt: true, pinned: true, pinnedAt: true },
+      select: { id: true, title: true, model: true, lastSetModel: true, lastSetPrompt: true, createdAt: true, lastMessageAt: true, pinned: true, pinnedAt: true },
       orderBy: [
         { pinned: "desc" },
         { pinnedAt: "desc" },
@@ -23,13 +23,18 @@ export const chatsRouter = createTRPCRouter({
     })
   ).mutation(async ({ ctx, input }) => {
     const id = input.id ?? crypto.randomUUID();
-    const chat = await ctx.db.chat.create({
-      data: {
+    const chat = await ctx.db.chat.upsert({
+      where: { id },
+      update: {
+        title: input.title ?? "New Chat",
+        model: input.model,
+      },
+      create: {
         id,
         title: input.title ?? "New Chat",
         model: input.model,
       },
-      select: { id: true, title: true, model: true, lastSetModel: true, createdAt: true, lastMessageAt: true, pinned: true, pinnedAt: true },
+      select: { id: true, title: true, model: true, lastSetModel: true, lastSetPrompt: true, createdAt: true, lastMessageAt: true, pinned: true, pinnedAt: true },
     });
     return { chat };
   }),
@@ -40,7 +45,7 @@ export const chatsRouter = createTRPCRouter({
     const chat = await ctx.db.chat.update({
       where: { id: input.id },
       data: { title: input.title },
-      select: { id: true, title: true, model: true, lastSetModel: true, createdAt: true, lastMessageAt: true, pinned: true, pinnedAt: true },
+      select: { id: true, title: true, model: true, lastSetModel: true, lastSetPrompt: true, createdAt: true, lastMessageAt: true, pinned: true, pinnedAt: true },
     });
     return { chat };
   }),
@@ -58,7 +63,7 @@ export const chatsRouter = createTRPCRouter({
     const chat = await ctx.db.chat.update({
       where: { id: input.id },
       data: { pinned: input.pinned, pinnedAt: input.pinned ? new Date() : null },
-      select: { id: true, title: true, model: true, lastSetModel: true, createdAt: true, lastMessageAt: true, pinned: true, pinnedAt: true },
+      select: { id: true, title: true, model: true, lastSetModel: true, lastSetPrompt: true, createdAt: true, lastMessageAt: true, pinned: true, pinnedAt: true },
     });
     return { chat };
   }),
@@ -66,10 +71,33 @@ export const chatsRouter = createTRPCRouter({
   setModel: publicProcedure.input(
     z.object({ id: z.string().uuid(), model: z.string().min(1).max(200) })
   ).mutation(async ({ ctx, input }) => {
-    const chat = await ctx.db.chat.update({
+    // Use upsert to handle cases where chat doesn't exist yet
+    const chat = await ctx.db.chat.upsert({
       where: { id: input.id },
-      data: { lastSetModel: input.model },
-      select: { id: true, title: true, model: true, lastSetModel: true, createdAt: true, lastMessageAt: true, pinned: true, pinnedAt: true },
+      update: { lastSetModel: input.model },
+      create: { 
+        id: input.id, 
+        title: "New Chat", 
+        lastSetModel: input.model 
+      },
+      select: { id: true, title: true, model: true, lastSetModel: true, lastSetPrompt: true, createdAt: true, lastMessageAt: true, pinned: true, pinnedAt: true },
+    });
+    return { chat };
+  }),
+
+  setPrompt: publicProcedure.input(
+    z.object({ id: z.string().uuid(), promptId: z.string().min(1).max(200) })
+  ).mutation(async ({ ctx, input }) => {
+    // Use upsert to handle cases where chat doesn't exist yet
+    const chat = await ctx.db.chat.upsert({
+      where: { id: input.id },
+      update: { lastSetPrompt: input.promptId },
+      create: { 
+        id: input.id, 
+        title: "New Chat", 
+        lastSetPrompt: input.promptId 
+      },
+      select: { id: true, title: true, model: true, lastSetModel: true, lastSetPrompt: true, createdAt: true, lastMessageAt: true, pinned: true, pinnedAt: true },
     });
     return { chat };
   }),

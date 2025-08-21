@@ -100,7 +100,7 @@ export default function ModelsTab() {
             ) : null
           ) : (
             models.map((m) => (
-              <ModelRow key={m.name} name={m.name} meta={{ family: m.family, parameterSize: m.parameterSize, quantization: m.quantization }} size={m.size} onRemoved={refetch} />
+              <ModelRow key={m.name} name={m.name} meta={{ family: m.family, parameterSize: m.parameterSize, quantization: m.quantization }} size={m.size} onRemoved={refetch} isPulling={m.name in pending} />
             ))
           )}
           {Object.entries(pending).map(([name, pct]) => (
@@ -117,16 +117,21 @@ export default function ModelsTab() {
   )
 }
 
-function ModelRow({ name, meta, size, pendingPercent, onRemoved }: { name: string; meta: { family?: string; parameterSize?: string; quantization?: string }; size?: number; pendingPercent?: number | null; onRemoved?: () => void }) {
-  const isPending = typeof pendingPercent === 'number'
+function ModelRow({ name, meta, size, pendingPercent, onRemoved, isPulling }: { name: string; meta: { family?: string; parameterSize?: string; quantization?: string }; size?: number; pendingPercent?: number | null; onRemoved?: () => void; isPulling?: boolean }) {
+  const isPending = typeof pendingPercent === 'number' || isPulling
   const { data } = useOllamaModelCapabilities(isPending ? undefined : name)
   const showQuery = api.models.show.useQuery(
     { model: name },
-    { enabled: !isPending, staleTime: 60_000 }
+    { 
+      enabled: !isPending && !!name, 
+      staleTime: 60_000,
+      retry: false // Don't retry failed requests for downloading models
+    }
   ) as any
   const removeMutation = api.models.remove.useMutation()
-  const hasThink = (data?.think.supported ?? false)
-  const hasVision = (data?.capabilities.vision ?? false)
+  // Only show capabilities for non-pending models
+  const hasThink = !isPending && (data?.think.supported ?? false)
+  const hasVision = !isPending && (data?.capabilities.vision ?? false)
   const toSize = (bytes?: number) => {
     if (!bytes || bytes <= 0) return '—'
     const gb = bytes / (1024 * 1024 * 1024)
@@ -135,6 +140,9 @@ function ModelRow({ name, meta, size, pendingPercent, onRemoved }: { name: strin
     return `${mb.toFixed(1)} MB`
   }
   const toCtx = () => {
+    // Don't try to get context for pending models
+    if (isPending) return '—'
+    
     const data = showQuery?.data as any
     const show = data?.details || {}
     // 1) model_info.*.context_length (e.g., llama.context_length)
@@ -176,12 +184,18 @@ function ModelRow({ name, meta, size, pendingPercent, onRemoved }: { name: strin
         </div>
       </div>
       <div className="flex items-center gap-4">
-        {typeof pendingPercent === 'number' ? (
+        {isPending ? (
           <div className="w-40">
-            <div className="h-1.5 w-full rounded bg-white/10 overflow-hidden">
-              <div className="h-1.5 bg-emerald-400" style={{ width: `${pendingPercent}%` }} />
-            </div>
-            <div className="mt-1 text-[10px] text-neutral-300">Pulling… {pendingPercent}%</div>
+            {typeof pendingPercent === 'number' ? (
+              <>
+                <div className="h-1.5 w-full rounded bg-white/10 overflow-hidden">
+                  <div className="h-1.5 bg-emerald-400" style={{ width: `${pendingPercent}%` }} />
+                </div>
+                <div className="mt-1 text-[10px] text-neutral-300">Pulling… {pendingPercent}%</div>
+              </>
+            ) : (
+              <div className="text-[10px] text-neutral-300">Finalizing…</div>
+            )}
           </div>
         ) : (
           <>

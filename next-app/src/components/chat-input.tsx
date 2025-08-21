@@ -14,6 +14,7 @@ import {
   PromptInputToolbar,
 } from '~/components/ai-elements/prompt-input'
 import { useOllamaModelCapabilities } from '~/hooks/use-ollama-model-capabilities'
+import { api } from '~/trpc/react'
 import { toast } from 'sonner'
 
 type ChatStatus = 'submitted' | 'streaming' | 'ready' | 'error'
@@ -23,19 +24,52 @@ export type ChatInputModel = { name: string }
 export type ChatInputProps = {
   models: ChatInputModel[]
   defaultModel?: string
+  chatId?: string
+  defaultSystemPromptId?: string
   placeholder?: string
   prefillText?: string
-  onSubmit?: (payload: { text: string; model: string; reasoningLevel: 'low' | 'medium' | 'high' }) => void
+  onSubmit?: (payload: { text: string; model: string; reasoningLevel: 'low' | 'medium' | 'high'; systemPromptContent?: string; systemPromptId?: string | 'none' }) => void
+  onStop?: () => void
+  status?: ChatStatus
   placement?: 'viewport' | 'container' | 'page'
   maxWidthClass?: string
 }
 
-export function ChatInput({ models, defaultModel, placeholder = 'Type your message…', prefillText, onSubmit, placement = 'viewport', maxWidthClass = 'max-w-3xl' }: ChatInputProps) {
+export function ChatInput({ models, defaultModel, chatId, defaultSystemPromptId, placeholder = 'Type your message…', prefillText, onSubmit, onStop, status: externalStatus, placement = 'viewport', maxWidthClass = 'max-w-3xl' }: ChatInputProps) {
   const [text, setText] = useState('')
   const [model, setModel] = useState('')
-  const [status, setStatus] = useState<ChatStatus>('ready')
+  const status = externalStatus ?? 'ready'
   const [reasoningLevel, setReasoningLevel] = useState<'low' | 'medium' | 'high'>('high')
   const { data: caps, error: capsError, thinkLevels } = useOllamaModelCapabilities(model)
+  const { data: promptData } = api.systemPrompts.list.useQuery(undefined, { refetchOnWindowFocus: false })
+  const systemPrompts = promptData?.prompts ?? []
+  const [systemPromptId, setSystemPromptId] = useState<string>('none')
+
+  // initialize and persist selected system prompt (like model)
+  useEffect(() => {
+    try {
+      const perChatKey = chatId ? `ollama:chat:${chatId}:systemPromptId` : null
+      const globalKey = 'ollama:selectedSystemPromptId'
+      const tryDefault = defaultSystemPromptId
+      const isValid = (val: string | undefined | null) => !!val && (val === 'none' || systemPrompts.some((p: any) => p.id === val))
+      const fromDefault = isValid(tryDefault) ? (tryDefault as string) : null
+      const fromPerChat = isValid(perChatKey ? localStorage.getItem(perChatKey) : null) ? (localStorage.getItem(perChatKey as string) as string) : null
+      const fromGlobal = isValid(localStorage.getItem(globalKey)) ? (localStorage.getItem(globalKey) as string) : null
+      const next = fromDefault ?? fromPerChat ?? fromGlobal ?? 'none'
+      if (next !== systemPromptId) setSystemPromptId(next)
+    } catch {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [promptData, chatId, defaultSystemPromptId])
+
+  useEffect(() => {
+    try {
+      const globalKey = 'ollama:selectedSystemPromptId'
+      localStorage.setItem(globalKey, systemPromptId)
+      if (chatId) {
+        localStorage.setItem(`ollama:chat:${chatId}:systemPromptId`, systemPromptId)
+      }
+    } catch {}
+  }, [systemPromptId, chatId])
 
   const effectiveDefault = useMemo(() => defaultModel ?? models[0]?.name ?? '', [defaultModel, models])
 
@@ -73,15 +107,25 @@ export function ChatInput({ models, defaultModel, placeholder = 'Type your messa
     // bubble up
     // if model doesn't support think, pass undefined to avoid enabling think
     const rl = thinkLevels.size > 0 && thinkLevels.has(reasoningLevel) ? reasoningLevel : undefined
-    onSubmit?.({ text, model, reasoningLevel: rl as any })
-    // temporary internal status handling (will be parent-controlled later)
-    setStatus('submitted')
-    setTimeout(() => setStatus('streaming'), 200)
-    setTimeout(() => {
-      setStatus('ready')
-      setText('')
-    }, 2000)
+    const selectedPrompt = systemPromptId !== 'none' ? systemPrompts.find((p: any) => p.id === systemPromptId) : undefined
+    onSubmit?.({ text, model, reasoningLevel: rl as any, systemPromptContent: selectedPrompt?.content, systemPromptId })
   }
+
+  const handleStop = () => {
+    onStop?.()
+  }
+
+  // Clear text only after successful submission (when status transitions from streaming to ready)
+  const [shouldClearText, setShouldClearText] = useState(false)
+  
+  useEffect(() => {
+    if (status === 'streaming') {
+      setShouldClearText(true)
+    } else if (status === 'ready' && shouldClearText) {
+      setText('')
+      setShouldClearText(false)
+    }
+  }, [status, shouldClearText])
 
   return (
     <div className={
@@ -113,6 +157,21 @@ export function ChatInput({ models, defaultModel, placeholder = 'Type your messa
                     ))}
                   </PromptInputModelSelectContent>
                 </PromptInputModelSelect>
+                <PromptInputModelSelect onValueChange={(v) => setSystemPromptId(v)} value={systemPromptId}>
+                  <PromptInputModelSelectTrigger className="h-8">
+                    <PromptInputModelSelectValue />
+                  </PromptInputModelSelectTrigger>
+                  <PromptInputModelSelectContent>
+                    <PromptInputModelSelectItem key={'none'} value={'none'}>
+                      Default
+                    </PromptInputModelSelectItem>
+                    {systemPrompts.map((p: any) => (
+                      <PromptInputModelSelectItem key={p.id} value={p.id}>
+                        {p.title}
+                      </PromptInputModelSelectItem>
+                    ))}
+                  </PromptInputModelSelectContent>
+                </PromptInputModelSelect>
                 {thinkLevels.size > 0 && (
                   <PromptInputModelSelect onValueChange={(v) => setReasoningLevel(v as any)} value={reasoningLevel}>
                     <PromptInputModelSelectTrigger className="h-8">
@@ -134,7 +193,12 @@ export function ChatInput({ models, defaultModel, placeholder = 'Type your messa
                 )}
               </div>
               <div />
-              <PromptInputSubmit disabled={!text} status={status} />
+              <PromptInputSubmit 
+                disabled={!text && status === 'ready'} 
+                status={status}
+                onClick={status === 'streaming' ? handleStop : undefined}
+                type={status === 'streaming' ? 'button' : 'submit'}
+              />
             </PromptInputToolbar>
           </PromptInput>
         </div>

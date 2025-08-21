@@ -17,6 +17,7 @@ model Chat {
   title         String
   model         String?
   lastSetModel  String?
+  lastSetPrompt String?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
   lastMessageAt DateTime?
@@ -47,4 +48,15 @@ enum MessageRole {
   ASSISTANT
   SYSTEM
   TOOL
+}
+
+// System prompts that can be selected in the chat toolbar
+model SystemPrompt {
+  id        String   @id
+  title     String
+  content   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([updatedAt])
 }

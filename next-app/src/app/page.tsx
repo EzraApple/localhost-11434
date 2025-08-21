@@ -67,13 +67,13 @@ export default function Home() {
         prefillText={prefill}
         placement="page"
         maxWidthClass="max-w-3xl"
-        onSubmit={({ text, model }) => {
+        onSubmit={({ text, model, systemPromptContent, systemPromptId }) => {
           const id = crypto.randomUUID()
           createChat(id, 'New Chat', model)
           selectChat(id)
           setSelectedModel(model)
           // store initial prompt in sessionStorage to avoid URL params
-          try { sessionStorage.setItem(`chat:${id}:initial`, JSON.stringify({ q: text, m: model })) } catch {}
+          try { sessionStorage.setItem(`chat:${id}:initial`, JSON.stringify({ q: text, m: model, s: systemPromptContent ?? null, sid: systemPromptId ?? null })) } catch {}
           router.push(`/chat/${id}`)
         }}
       />

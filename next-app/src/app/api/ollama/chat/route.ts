@@ -7,13 +7,14 @@ const client = new Ollama({ host: "http://127.0.0.1:11434" });
 
 export async function POST(req: Request) {
   try {
-    const { model, messages, think, reasoningLevel, chatId, assistantMessageId } = (await req.json()) as {
+    const { model, messages, think, reasoningLevel, chatId, assistantMessageId, userMessageId } = (await req.json()) as {
       model: string;
       messages: { role: "system" | "user" | "assistant" | "tool"; content: string }[];
       think?: boolean | "low" | "medium" | "high";
       reasoningLevel?: "low" | "medium" | "high";
       chatId?: string;
       assistantMessageId?: string;
+      userMessageId?: string;
     };
 
     let stream: AsyncIterable<any> | undefined;
