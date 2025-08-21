@@ -22,12 +22,9 @@ jobs:
       uses: actions/setup-node@v4
       with:
         node-version: ${{ matrix.node-version }}
-        cache: 'pnpm'
 
-    - name: Setup pnpm
-      uses: pnpm/action-setup@v4
-      with:
-        version: 10.6.4
+    - name: Install pnpm
+      run: npm install -g pnpm@10.6.4
 
     - name: Get pnpm store directory
       shell: bash
