@@ -1,16 +1,17 @@
 'use client'
 
 import { useParams, useSearchParams } from 'next/navigation'
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { api } from '~/trpc/react'
 import ChatInput from '~/components/chat-input'
 import { useOllamaChat } from '~/hooks/use-ollama-chat'
 import { Conversation, ConversationContent } from '~/components/ai-elements/conversation'
-import { Message, MessageContent } from '~/components/ai-elements/message'
+import { Message, MessageContent, MessageImage } from '~/components/ai-elements/message'
 import { Reasoning, ReasoningContent, ReasoningTrigger } from '~/components/ai-elements/reasoning'
 import { Response } from '~/components/ai-elements/response'
 import { useChatStore } from '~/lib/chat-store'
 import { toast } from 'sonner'
+import { Paperclip } from 'lucide-react'
 // call server route for chat name to avoid importing node-only SDK in client
 
 
@@ -45,6 +46,8 @@ export default function ChatByIdPage() {
 
   const { messages, status, streamPhase, submit, editMessage, retryMessage, abort } = useOllamaChat(String(id))
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null)
+  const [isDragOver, setIsDragOver] = useState(false)
+  const [uploadedImages, setUploadedImages] = useState<Array<{ data: string; mimeType: string; fileName: string }>>([])
   const utils = api.useUtils()
   const setModelMutation = api.chats.setModel.useMutation({
     onSuccess: () => {
@@ -76,15 +79,17 @@ export default function ChatByIdPage() {
     let model = search?.get('m')
     let sys: string | null | undefined = search?.get('s')
     let sysId: string | null | undefined = search?.get('sid')
+    let initialImages: Array<{ data: string; mimeType: string; fileName: string }> | null = null
     if (!first || !model) {
       try {
         const raw = sessionStorage.getItem(`chat:${String(id)}:initial`)
         if (raw) {
-          const obj = JSON.parse(raw) as { q?: string; m?: string; s?: string | null; sid?: string | null }
+          const obj = JSON.parse(raw) as { q?: string; m?: string; s?: string | null; sid?: string | null; images?: Array<{ data: string; mimeType: string; fileName: string }> | null }
           first = obj.q ?? first
           model = obj.m ?? model
           sys = obj.s ?? sys
           sysId = obj.sid ?? sysId
+          initialImages = obj.images ?? null
           sessionStorage.removeItem(`chat:${String(id)}:initial`)
         }
       } catch {}
@@ -92,6 +97,11 @@ export default function ChatByIdPage() {
     if (!didAutoSubmitRef.current && first && model) {
       didAutoSubmitRef.current = true
       selectChat(String(id))
+      
+      // Set initial images if they exist (will be cleared after submit)
+      if (initialImages && initialImages.length > 0) {
+        setUploadedImages(initialImages)
+      }
       // fire-and-forget name generation
       ;(async () => {
         try {
@@ -106,7 +116,11 @@ export default function ChatByIdPage() {
             toast.error('Failed to name chat', { description: detail || 'Server responded with an error.' })
           } else {
             const name = String(data?.title ?? '')
-            if (name) renameChat(String(id), name)
+            if (name) {
+              renameChat(String(id), name)
+              // Invalidate chats cache to update sidebar immediately
+              utils.chats.list.invalidate()
+            }
           }
         } catch (e) {
           const msg = e instanceof Error ? e.message : 'Unknown error'
@@ -124,7 +138,7 @@ export default function ChatByIdPage() {
       } catch {}
       // Small delay to ensure component has mounted and UI is ready
       setTimeout(() => {
-        submit({ text: first, model, systemPromptContent: sys ?? undefined })
+        submit({ text: first, model, systemPromptContent: sys ?? undefined, images: initialImages ?? undefined })
       }, 100)
       // Update chat store with the selected system prompt
       if (sysId && sysId !== 'none') {
@@ -169,11 +183,75 @@ export default function ChatByIdPage() {
       setModelMutation.mutate({ id: chatIdStr, model: selectedModel })
     }
     // Use the current selected model for the edit
-    await editMessage(messageId, newText, selectedModel)
+    await editMessage(messageId, newText, selectedModel, undefined, undefined)
   }
 
   const handleEditCancel = () => {
     setEditingMessageId(null)
+  }
+
+  // Drag and drop handlers
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault()
+    if (!isDragOver) {
+      setIsDragOver(true)
+    }
+  }
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault()
+    // Only set to false if we're leaving the component entirely
+    if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+      setIsDragOver(false)
+    }
+  }
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault()
+    setIsDragOver(false)
+
+    const files = Array.from(e.dataTransfer.files)
+    const imageFiles = files.filter(file =>
+      file.type.startsWith('image/') &&
+      file.size <= 10 * 1024 * 1024 // 10MB limit
+    )
+
+    if (imageFiles.length === 0) {
+      toast.error('Unsupported file type', {
+        description: 'Please upload image files only (PNG, JPG, JPEG, GIF, WebP)'
+      })
+      return
+    }
+
+    const promises = imageFiles.map(file => {
+      return new Promise<{ data: string; mimeType: string; fileName: string }>((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = () => {
+          const result = reader.result
+          if (!result) {
+            reject(new Error('Failed to read file'))
+            return
+          }
+          const resultStr = result as string
+          const base64Data = resultStr.split(',')[1]
+          if (!base64Data) {
+            reject(new Error('Invalid file format'))
+            return
+          }
+          resolve({
+            data: base64Data,
+            mimeType: file.type,
+            fileName: file.name
+          })
+        }
+        reader.onerror = reject
+        reader.readAsDataURL(file)
+      })
+    })
+
+    Promise.all(promises).then(images => {
+      setUploadedImages(prev => [...prev, ...images])
+    })
   }
 
   const handleRetry = async (messageId: string, model?: string) => {
@@ -193,7 +271,27 @@ export default function ChatByIdPage() {
   }
 
   return (
-    <div className="relative mx-auto h-dvh flex w-full max-w-4xl flex-1 flex-col gap-4 p-4 pb-0">
+    <div
+      className="relative mx-auto h-dvh flex min-w-full flex-1 flex-col gap-4 p-4 pb-0"
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+    >
+        {/* Full window drag overlay */}
+        {isDragOver && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#0a1515]/80 backdrop-blur-sm">
+            <div className="flex flex-col items-center gap-4 p-8 rounded-2xl border border-[#2b3f3e]/30 bg-[#132827]/90 shadow-2xl">
+              <div className="w-16 h-16 rounded-full bg-[#22c55e]/10 flex items-center justify-center">
+                <Paperclip className="w-8 h-8 text-[#22c55e]" />
+              </div>
+              <div className="text-center">
+                <div className="text-[#e5e9e8] font-medium text-lg mb-2">Drop images here</div>
+                <div className="text-[#8b9491] text-sm">Supports: PNG, JPG, JPEG, GIF, WebP (max 10MB)</div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* header strip now rendered in layout to avoid occlusion */}
         <Conversation>
           <ConversationContent className="pb-32">
@@ -223,12 +321,23 @@ export default function ChatByIdPage() {
                         </Reasoning>
                       )
                     }
+                    if (p.type === 'image') {
+                      return (
+                        <MessageImage
+                          key={`image-${idx}`}
+                          data={p.data}
+                          mimeType={p.mimeType}
+                          fileName={p.fileName}
+                        />
+                      )
+                    }
                     return <Response key={`response-${idx}`} isWaiting={status === 'submitted' && idx === 0 && m.role === 'assistant'}>{p.text}</Response>
                   })}
                 </MessageContent>
               </Message>
             ))}
-            {((status === 'submitted' || status === 'streaming') && !messages.some(m => m.role === 'assistant')) ? (
+            {((status === 'submitted' || status === 'streaming') && 
+              (messages.length === 0 || messages[messages.length - 1]?.role === 'user')) ? (
               <Message from={'assistant'}>
                 <MessageContent>
                   <div className="flex items-center gap-2">
@@ -251,10 +360,12 @@ export default function ChatByIdPage() {
             placement="container"
             maxWidthClass="max-w-4xl"
             status={status}
-            autoClear={false}
+            autoClear={true}
             initialAutoSubmit={true}
             onStop={abort}
-            onSubmit={({ text, model, reasoningLevel, systemPromptContent, systemPromptId }) => {
+            uploadedImages={uploadedImages}
+            onImagesChange={useCallback((images: Array<{ data: string; mimeType: string; fileName: string }>) => setUploadedImages(images), [])}
+            onSubmit={({ text, model, reasoningLevel, systemPromptContent, systemPromptId, images }) => {
               // Update selected model locally
               setSelectedModel(model)
               // Persist model selection for this chat (with small delay to ensure chat exists)
@@ -273,7 +384,7 @@ export default function ChatByIdPage() {
                 }, 100)
               }
               // Submit the message
-              submit({ text, model, reasoningLevel, systemPromptContent })
+              submit({ text, model, reasoningLevel, systemPromptContent, images })
             }}
           />
         </div>

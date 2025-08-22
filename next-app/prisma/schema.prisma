@@ -36,7 +36,7 @@ model Message {
   chatId    String
   chat      Chat        @relation(fields: [chatId], references: [id], onDelete: Cascade)
   role      MessageRole
-  parts     Json
+  parts     Json        // JSON array of message parts: {type: 'text'|'reasoning'|'image', text?: string, data?: string, mimeType?: string, fileName?: string}
   createdAt DateTime    @default(now())
   index     Int?
 

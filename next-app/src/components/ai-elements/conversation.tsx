@@ -10,18 +10,19 @@ import { StickToBottom, useStickToBottomContext } from 'use-stick-to-bottom';
 export type ConversationProps = ComponentProps<typeof StickToBottom>;
 
 export const Conversation = ({ className, ...props }: ConversationProps) => (
-  <StickToBottom
-    className={cn(
-      'relative flex-1 min-h-0 overflow-y-auto',
-      // Custom scrollbar styling for dark theme using webkit-scrollbar
-      '[&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-[#2b3f3e] [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb:hover]:bg-[#3a514f]',
-      className
-    )}
-    initial="smooth"
-    resize="smooth"
-    role="log"
-    {...props}
-  />
+  <div className={cn('relative flex-1 min-h-0 w-full', className)}>
+    <StickToBottom
+      className={cn(
+        'absolute inset-0 overflow-y-auto',
+        // Custom scrollbar styling for dark theme using webkit-scrollbar
+        '[&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-[#2b3f3e] [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb:hover]:bg-[#3a514f]'
+      )}
+      initial="smooth"
+      resize="smooth"
+      role="log"
+      {...props}
+    />
+  </div>
 );
 
 export type ConversationContentProps = ComponentProps<
@@ -32,7 +33,7 @@ export const ConversationContent = ({
   className,
   ...props
 }: ConversationContentProps) => (
-  <StickToBottom.Content className={cn('p-4 max-w-4xl w-full mx-auto', className)} {...props} />
+  <StickToBottom.Content className={cn('p-4 max-w-4xl w-full mx-auto relative', className)} {...props} />
 );
 
 export type ConversationScrollButtonProps = ComponentProps<typeof Button>;

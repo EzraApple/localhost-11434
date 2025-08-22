@@ -35,6 +35,7 @@ export function ChatStoreProvider({ children }: { children: React.ReactNode }) {
   // hydrate chats from server
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { data: chatsData } = api.chats.list.useQuery(undefined, { refetchOnWindowFocus: false, staleTime: 5_000 })
+  const utils = api.useUtils()
   import('react').then(({ useEffect }) => {
     // TS appeasement for hook placement; actual effect below
   })
@@ -63,22 +64,30 @@ export function ChatStoreProvider({ children }: { children: React.ReactNode }) {
     const old = chats.find(c => c.id === id)
     setChats(prev => prev.map(c => (c.id === id ? { ...c, title } : c)))
     renameChatMutation.mutate({ id, title } as any, {
+      onSuccess: () => {
+        // Invalidate chats cache to ensure UI consistency
+        utils.chats.list.invalidate()
+      },
       onError: () => {
         if (old) setChats(prev => prev.map(c => (c.id === id ? old : c)))
       },
     })
-  }, [chats, renameChatMutation])
+  }, [chats, renameChatMutation, utils])
 
   const pinChatMutation = api.chats.pin.useMutation()
   const pinChat = useCallback((id: string, pinned: boolean) => {
     const old = chats.find(c => c.id === id)
     setChats(prev => prev.map(c => (c.id === id ? { ...c, pinned } : c)))
     pinChatMutation.mutate({ id, pinned } as any, {
+      onSuccess: () => {
+        // Invalidate chats cache to ensure UI consistency
+        utils.chats.list.invalidate()
+      },
       onError: () => {
         if (old) setChats(prev => prev.map(c => (c.id === id ? old : c)))
       },
     })
-  }, [chats, pinChatMutation])
+  }, [chats, pinChatMutation, utils])
 
   const setLastSetPrompt = useCallback((id: string, promptId: string | null) => {
     setChats(prev => prev.map(c => (c.id === id ? { ...c, lastSetPrompt: promptId } : c)))
@@ -113,11 +122,15 @@ export function ChatStoreProvider({ children }: { children: React.ReactNode }) {
     setChats(prev => prev.filter(c => c.id !== id))
     if (selectedChatId === id) setSelectedChatId(null)
     deleteChatMutation.mutate({ id } as any, {
+      onSuccess: () => {
+        // Invalidate chats cache to ensure UI consistency
+        utils.chats.list.invalidate()
+      },
       onError: () => {
         setChats(prevChats)
       },
     })
-  }, [chats, deleteChatMutation, selectedChatId])
+  }, [chats, deleteChatMutation, selectedChatId, utils])
 
   const storeValue = useMemo<ChatStore>(() => ({
     chats,

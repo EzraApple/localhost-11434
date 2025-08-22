@@ -1,10 +1,22 @@
 import { z } from "zod";
 import { createTRPCRouter, publicProcedure } from "~/server/api/trpc";
 
-const messagePartSchema = z.object({
-  type: z.enum(["reasoning", "text"]),
-  text: z.string(),
-});
+const messagePartSchema = z.discriminatedUnion("type", [
+  z.object({
+    type: z.literal("reasoning"),
+    text: z.string(),
+  }),
+  z.object({
+    type: z.literal("text"),
+    text: z.string(),
+  }),
+  z.object({
+    type: z.literal("image"),
+    data: z.string(),
+    mimeType: z.string(),
+    fileName: z.string().optional(),
+  }),
+]);
 
 export const messagesRouter = createTRPCRouter({
   list: publicProcedure.input(z.object({ chatId: z.string().uuid() })).query(async ({ ctx, input }) => {

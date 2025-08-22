@@ -9,7 +9,7 @@ export async function POST(req: Request) {
   try {
     const { model, messages, think, reasoningLevel, chatId, assistantMessageId, userMessageId } = (await req.json()) as {
       model: string;
-      messages: { role: "system" | "user" | "assistant" | "tool"; content: string }[];
+      messages: { role: "system" | "user" | "assistant" | "tool"; content: string; images?: string[] }[];
       think?: boolean | "low" | "medium" | "high";
       reasoningLevel?: "low" | "medium" | "high";
       chatId?: string;
@@ -19,9 +19,22 @@ export async function POST(req: Request) {
 
     let stream: AsyncIterable<any> | undefined;
     try {
+      const formattedMessages = messages.map((m) => ({
+        role: m.role,
+        content: m.content,
+        ...(m.images && m.images.length > 0 ? { images: m.images } : {})
+      }));
+
+      // Debug logging
+      console.log("[ollama] formatted messages:", formattedMessages.map(m => ({
+        role: m.role,
+        content: m.content?.substring(0, 100) + (m.content && m.content.length > 100 ? '...' : ''),
+        hasImages: !!(m as any).images?.length
+      })));
+
       stream = await client.chat({
         model,
-        messages: messages.map((m) => ({ role: m.role, content: m.content })),
+        messages: formattedMessages,
         stream: true,
         think: (reasoningLevel as any) ?? think ?? false,
       });

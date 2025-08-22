@@ -10,7 +10,7 @@ export async function POST(req: Request) {
       firstMessage: string;
       maxLen?: number;
     };
-    const prompt = `Generate a concise, single-line chat title (max 60 chars) for this first user message. No quotes, no punctuation at the end.\n\nMessage:\n"""${firstMessage}"""`;
+    const prompt = `Generate a concise, single-line chat title (max 60 chars) for this first user message. Respond only with the concise title and nothing else. No quotes, no punctuation at the end.\n\nMessage:\n"""${firstMessage}"""`;
     let res: any;
     try {
       res = (await client.chat({

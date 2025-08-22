@@ -11,7 +11,7 @@ import {
 import { Textarea } from '~/components/ui/textarea';
 import { cn } from '~/lib/utils';
 import type { ChatStatus } from 'ai';
-import { Loader2Icon, ArrowUp, SquareIcon, XIcon } from 'lucide-react';
+import { Loader2Icon, ArrowUp, SquareIcon, XIcon, Paperclip } from 'lucide-react';
 import type {
   ComponentProps,
   HTMLAttributes,
@@ -228,3 +228,84 @@ export const PromptInputModelSelectValue = ({
 }: PromptInputModelSelectValueProps) => (
   <SelectValue className={cn(className)} {...props} />
 );
+
+export type PromptInputImageUploadProps = ComponentProps<typeof Button> & {
+  onImagesSelected?: (images: Array<{ data: string; mimeType: string; fileName: string }>) => void;
+  disabled?: boolean;
+  accept?: string;
+  maxFiles?: number;
+  maxSizeMB?: number;
+};
+
+export const PromptInputImageUpload = ({
+  className,
+  onImagesSelected,
+  disabled = false,
+  accept = "image/*",
+  maxFiles = 5,
+  maxSizeMB = 10,
+  ...props
+}: PromptInputImageUploadProps) => {
+  const handleFileSelect = (files: FileList | null) => {
+    if (!files || disabled) return;
+
+    const imageFiles = Array.from(files).filter(file =>
+      file.type.startsWith('image/') &&
+      file.size <= maxSizeMB * 1024 * 1024
+    ).slice(0, maxFiles);
+
+    if (imageFiles.length === 0) return;
+
+    const promises = imageFiles.map(file => {
+      return new Promise<{ data: string; mimeType: string; fileName: string }>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const result = reader.result as string;
+          // Remove the data URL prefix (e.g., "data:image/jpeg;base64,")
+          const base64Data = result.split(',')[1];
+          resolve({
+            data: base64Data,
+            mimeType: file.type,
+            fileName: file.name
+          });
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+    });
+
+    Promise.all(promises).then(images => {
+      onImagesSelected?.(images);
+    });
+  };
+
+  const handleClick = () => {
+    if (disabled) return;
+
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.multiple = maxFiles > 1;
+    input.accept = accept;
+    input.onchange = (e) => handleFileSelect((e.target as HTMLInputElement).files);
+    input.click();
+  };
+
+  return (
+    <Button
+      className={cn(
+        'shrink-0 gap-1.5 rounded-lg',
+        'text-muted-foreground hover:text-foreground',
+        disabled && 'opacity-50 cursor-not-allowed',
+        className
+      )}
+      size="icon"
+      type="button"
+      variant="ghost"
+      onClick={handleClick}
+      disabled={disabled}
+      {...props}
+    >
+      <Paperclip className="size-4" />
+    </Button>
+  );
+};

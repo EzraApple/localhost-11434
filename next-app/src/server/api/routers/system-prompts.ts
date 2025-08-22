@@ -1,7 +1,5 @@
 import { z } from "zod";
 import { createTRPCRouter, publicProcedure } from "~/server/api/trpc";
-import type { StructuredSystemPrompt } from "~/app/settings/lib/system-prompts/types";
-import { buildFinalPrompt } from "~/app/settings/lib/system-prompts/builder";
 
 export const systemPromptsRouter = createTRPCRouter({
   list: publicProcedure.input(z.void()).query(async ({ ctx }) => {

@@ -6,7 +6,7 @@ import { api } from '~/trpc/react'
 import { toast } from 'sonner'
 import { useChatStore } from '~/lib/chat-store'
 import ChatInput from '~/components/chat-input'
-import { Loader2 } from 'lucide-react'
+import { Loader2, Paperclip } from 'lucide-react'
 
 type ModelInfo = { name: string }
 
@@ -42,14 +42,100 @@ export default function Home() {
 
   const [prefill, setPrefill] = useState<string>('')
   const [isUserTyping, setIsUserTyping] = useState(false)
+  const [uploadedImages, setUploadedImages] = useState<Array<{ data: string; mimeType: string; fileName: string }>>([])
+  const [isDragOver, setIsDragOver] = useState(false)
+
+  // Drag and drop handlers
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault()
+    if (!isDragOver) {
+      setIsDragOver(true)
+    }
+  }
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault()
+    // Only set to false if we're leaving the component entirely
+    if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+      setIsDragOver(false)
+    }
+  }
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault()
+    setIsDragOver(false)
+
+    const files = Array.from(e.dataTransfer.files)
+    const imageFiles = files.filter(file =>
+      file.type.startsWith('image/') &&
+      file.size <= 10 * 1024 * 1024 // 10MB limit
+    )
+
+    if (imageFiles.length === 0) {
+      toast.error('Unsupported file type', {
+        description: 'Please upload image files only (PNG, JPG, JPEG, GIF, WebP)'
+      })
+      return
+    }
+
+    const promises = imageFiles.map(file => {
+      return new Promise<{ data: string; mimeType: string; fileName: string }>((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = () => {
+          const result = reader.result
+          if (!result) {
+            reject(new Error('Failed to read file'))
+            return
+          }
+          const resultStr = result as string
+          const base64Data = resultStr.split(',')[1]
+          if (!base64Data) {
+            reject(new Error('Invalid file format'))
+            return
+          }
+          resolve({
+            data: base64Data,
+            mimeType: file.type,
+            fileName: file.name
+          })
+        }
+        reader.onerror = reject
+        reader.readAsDataURL(file)
+      })
+    })
+
+    Promise.all(promises).then(images => {
+      setUploadedImages(prev => [...prev, ...images])
+    })
+  }
 
   return (
-    <div className="relative min-h-dvh pb-40">
+    <div
+      className="relative min-h-dvh pb-40"
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+    >
       <div className="pointer-events-none absolute inset-0 -z-10">
         <div className="absolute inset-0 opacity-40" style={{ backgroundImage: 'radial-gradient(closest-corner at 120px 36px, rgba(14, 78, 71, 0.16), rgba(14, 78, 71, 0.08)), linear-gradient(rgb(12, 24, 25) 15%, rgb(8, 14, 15))' }} />
         <div className="absolute inset-0 bg-noise" />
         <div className="absolute inset-0 bg-[#0a1616]/30" />
       </div>
+
+      {/* Full window drag overlay */}
+      {isDragOver && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#0a1515]/80 backdrop-blur-sm">
+          <div className="flex flex-col items-center gap-4 p-8 rounded-2xl border border-[#2b3f3e]/30 bg-[#132827]/90 shadow-2xl">
+            <div className="w-16 h-16 rounded-full bg-[#22c55e]/10 flex items-center justify-center">
+              <Paperclip className="w-8 h-8 text-[#22c55e]" />
+            </div>
+            <div className="text-center">
+              <div className="text-[#e5e9e8] font-medium text-lg mb-2">Drop images here</div>
+              <div className="text-[#8b9491] text-sm">Supports: PNG, JPG, JPEG, GIF, WebP (max 10MB)</div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Loading overlay */}
       {isNavigating && (
@@ -85,9 +171,11 @@ export default function Home() {
         prefillText={prefill}
         placement="page"
         maxWidthClass="max-w-3xl"
+        uploadedImages={uploadedImages}
+        onImagesChange={setUploadedImages}
         onTypingStart={() => setIsUserTyping(true)}
         onTypingStop={() => setIsUserTyping(false)}
-        onSubmit={async ({ text, model, systemPromptContent, systemPromptId }) => {
+        onSubmit={async ({ text, model, systemPromptContent, systemPromptId, images }) => {
           setIsNavigating(true)
           const id = crypto.randomUUID()
 
@@ -102,13 +190,18 @@ export default function Home() {
               q: text,
               m: model,
               s: systemPromptContent ?? null,
-              sid: systemPromptId ?? null
+              sid: systemPromptId ?? null,
+              images: images ?? null
             }))
           } catch {}
 
           // Small delay to ensure chat is properly created before navigation
           await new Promise(resolve => setTimeout(resolve, 50))
 
+          // Clear the form after successful submission
+          setPrefill('')
+          setUploadedImages([])
+          
           // Navigate to chat page
           router.push(`/chat/${id}`)
         }}

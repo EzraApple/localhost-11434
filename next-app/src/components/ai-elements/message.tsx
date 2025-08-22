@@ -141,3 +141,33 @@ export const MessageAvatar = ({
     <AvatarFallback>{name?.slice(0, 2) || 'ME'}</AvatarFallback>
   </Avatar>
 );
+
+export type MessageImageProps = {
+  data: string;
+  mimeType: string;
+  fileName?: string;
+  className?: string;
+};
+
+export const MessageImage = ({
+  data,
+  mimeType,
+  fileName,
+  className
+}: MessageImageProps) => (
+  <div className={cn('flex flex-col gap-2', className)}>
+    <div className="relative max-w-sm">
+      <img
+        src={`data:${mimeType};base64,${data}`}
+        alt={fileName || 'Uploaded image'}
+        className="w-full h-auto rounded-lg border border-[#113936]/30 shadow-sm"
+        style={{ maxHeight: '300px', objectFit: 'contain' }}
+      />
+    </div>
+    {fileName && (
+      <div className="text-xs text-[#8b9491] truncate" title={fileName}>
+        {fileName}
+      </div>
+    )}
+  </div>
+);
