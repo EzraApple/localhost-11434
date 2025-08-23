@@ -9,6 +9,7 @@ import ChatInput from '~/components/chat-input'
 import { Loader2, Paperclip } from 'lucide-react'
 import { parseFile, getFileType, getSupportedFileTypesDescription, getModelFileCapabilities, type FileUploadItem } from '~/lib/file-upload'
 import { useModelCapabilitiesCache } from '~/hooks/use-model-capabilities-cache'
+import { useModelPreload } from '~/hooks/use-model-preload'
 
 type ModelInfo = { name: string }
 
@@ -52,6 +53,9 @@ export default function Home() {
   const currentModelCaps = getCapabilities(selectedModel)
   const fileCapabilities = getModelFileCapabilities(currentModelCaps)
   const supportedTypesDescription = getSupportedFileTypesDescription(fileCapabilities)
+  
+  // Model preloading
+  const { preloadModel } = useModelPreload()
 
   // Drag and drop handlers
   const handleDragOver = (e: React.DragEvent) => {
@@ -161,7 +165,13 @@ export default function Home() {
         uploadedFiles={uploadedFiles}
         onFilesChange={setUploadedFiles}
         hasImagesInHistory={false}
-        onTypingStart={() => setIsUserTyping(true)}
+        onTypingStart={() => {
+          setIsUserTyping(true)
+          // Preload the selected model when user starts typing
+          if (selectedModel) {
+            preloadModel(selectedModel)
+          }
+        }}
         onTypingStop={() => setIsUserTyping(false)}
         onSubmit={async ({ text, model, systemPromptContent, systemPromptId, images, files, userMessage }) => {
           setIsNavigating(true)

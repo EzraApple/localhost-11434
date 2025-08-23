@@ -2,6 +2,7 @@
 
 import { createContext, useCallback, useContext, useMemo, useState } from 'react'
 import { api } from '~/trpc/react'
+import { usePreloadedChats } from '~/hooks/use-preloaded-chats'
 
 export type ChatListItem = {
   id: string
@@ -35,6 +36,10 @@ export function ChatStoreProvider({ children }: { children: React.ReactNode }) {
   // hydrate chats from server
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { data: chatsData } = api.chats.list.useQuery(undefined, { refetchOnWindowFocus: false, staleTime: 5_000 })
+  
+  // preload important chat histories for faster navigation
+  // This runs in the background and keeps cache warm
+  usePreloadedChats()
   const utils = api.useUtils()
   import('react').then(({ useEffect }) => {
     // TS appeasement for hook placement; actual effect below
@@ -67,6 +72,8 @@ export function ChatStoreProvider({ children }: { children: React.ReactNode }) {
       onSuccess: () => {
         // Invalidate chats cache to ensure UI consistency
         utils.chats.list.invalidate()
+        // Invalidate preloaded cache since chat metadata changed
+        utils.chats.preloadImportantChats.invalidate()
       },
       onError: () => {
         if (old) setChats(prev => prev.map(c => (c.id === id ? old : c)))
@@ -82,6 +89,8 @@ export function ChatStoreProvider({ children }: { children: React.ReactNode }) {
       onSuccess: () => {
         // Invalidate chats cache to ensure UI consistency
         utils.chats.list.invalidate()
+        // Invalidate preloaded cache since chat metadata changed
+        utils.chats.preloadImportantChats.invalidate()
       },
       onError: () => {
         if (old) setChats(prev => prev.map(c => (c.id === id ? old : c)))
@@ -125,6 +134,8 @@ export function ChatStoreProvider({ children }: { children: React.ReactNode }) {
       onSuccess: () => {
         // Invalidate chats cache to ensure UI consistency
         utils.chats.list.invalidate()
+        // Invalidate preloaded cache since chat metadata changed
+        utils.chats.preloadImportantChats.invalidate()
       },
       onError: () => {
         setChats(prevChats)

@@ -17,6 +17,7 @@ import {
 import { Tooltip, TooltipContent, TooltipTrigger } from '~/components/ui/tooltip'
 import { useOllamaModelCapabilities } from '~/hooks/use-ollama-model-capabilities'
 import { useModelCapabilitiesCache } from '~/hooks/use-model-capabilities-cache'
+import { useModelPreload } from '~/hooks/use-model-preload'
 import { getModelFileCapabilities, getSupportedFileTypesDescription, getAcceptedFileTypes, hasImagesInFiles, hasPDFsInFiles, hasProcessingFiles, type FileUploadItem } from '~/lib/file-upload'
 import { formatPDFForPrompt } from '~/lib/pdf'
 import { api } from '~/trpc/react'
@@ -61,6 +62,7 @@ export function ChatInput({ models, defaultModel, chatId, defaultSystemPromptId,
   const [reasoningLevel, setReasoningLevel] = useState<'low' | 'medium' | 'high'>('high')
   const { data: caps, error: capsError, thinkLevels } = useOllamaModelCapabilities(model)
   const { getCapabilities } = useModelCapabilitiesCache(models)
+  const { preloadModel } = useModelPreload()
   const { data: promptData } = api.systemPrompts.list.useQuery(undefined, { refetchOnWindowFocus: false })
   const systemPrompts = promptData?.prompts ?? []
   
@@ -407,9 +409,16 @@ export function ChatInput({ models, defaultModel, chatId, defaultSystemPromptId,
                 setText(e.target.value)
                 // Call onTypingStart when user starts typing (from empty to non-empty)
                 // But not if the text was set via prefill
-                if (!text && e.target.value && onTypingStart && !hasCalledTypingStart.current && !isTextFromPrefill.current) {
+                if (!text && e.target.value && !hasCalledTypingStart.current && !isTextFromPrefill.current) {
                   hasCalledTypingStart.current = true
-                  onTypingStart()
+                  
+                  // Preload the current model to warm it up
+                  if (model) {
+                    preloadModel(model)
+                  }
+                  
+                  // Call the original onTypingStart callback
+                  onTypingStart?.()
                 }
                 // Call onTypingStop when user deletes all text (from non-empty to empty)
                 if (text && !e.target.value && onTypingStop && hasCalledTypingStart.current) {

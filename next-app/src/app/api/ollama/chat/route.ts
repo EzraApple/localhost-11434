@@ -37,6 +37,7 @@ export async function POST(req: Request) {
         messages: formattedMessages,
         stream: true,
         think: (reasoningLevel as any) ?? think ?? false,
+        keep_alive: '8m', // Keep model in memory during active conversation
       });
     } catch (e: unknown) {
       const err = e as Error;
