@@ -16,6 +16,14 @@ const messagePartSchema = z.discriminatedUnion("type", [
     mimeType: z.string(),
     fileName: z.string().optional(),
   }),
+  z.object({
+    type: z.literal("file"),
+    data: z.string(),
+    mimeType: z.string(),
+    fileName: z.string(),
+    content: z.string().optional(),
+    fileType: z.string().optional(),
+  }),
 ]);
 
 export const messagesRouter = createTRPCRouter({

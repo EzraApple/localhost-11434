@@ -18,6 +18,7 @@ import type {
   KeyboardEventHandler,
 } from 'react';
 import { Children } from 'react';
+import type { FileUploadItem } from '~/lib/file-upload';
 
 export type PromptInputProps = HTMLAttributes<HTMLFormElement>;
 
@@ -229,54 +230,49 @@ export const PromptInputModelSelectValue = ({
   <SelectValue className={cn(className)} {...props} />
 );
 
-export type PromptInputImageUploadProps = ComponentProps<typeof Button> & {
-  onImagesSelected?: (images: Array<{ data: string; mimeType: string; fileName: string }>) => void;
+export type PromptInputFileUploadProps = ComponentProps<typeof Button> & {
+  onFilesSelected?: (files: FileUploadItem[]) => void;
   disabled?: boolean;
   accept?: string;
   maxFiles?: number;
-  maxSizeMB?: number;
+  supportedTypes?: string;
+  tooltip?: string;
 };
 
-export const PromptInputImageUpload = ({
+export const PromptInputFileUpload = ({
   className,
-  onImagesSelected,
+  onFilesSelected,
   disabled = false,
-  accept = "image/*",
-  maxFiles = 5,
-  maxSizeMB = 10,
+  accept = "*",
+  maxFiles = 10,
+  supportedTypes = "",
+  tooltip = "Upload files",
   ...props
-}: PromptInputImageUploadProps) => {
-  const handleFileSelect = (files: FileList | null) => {
+}: PromptInputFileUploadProps) => {
+  const handleFileSelect = async (files: FileList | null) => {
     if (!files || disabled) return;
 
-    const imageFiles = Array.from(files).filter(file =>
-      file.type.startsWith('image/') &&
-      file.size <= maxSizeMB * 1024 * 1024
-    ).slice(0, maxFiles);
+    const fileArray = Array.from(files).slice(0, maxFiles);
+    
+    try {
+      const { parseFile, validateFile, getFileType } = await import('~/lib/file-upload');
+      
+      const parsedFiles = await Promise.all(
+        fileArray.map(async (file) => {
+          const fileType = getFileType(file);
+          if (!fileType) {
+            throw new Error(`Unsupported file type: ${file.name}`);
+          }
+          
+          return await parseFile(file, fileType);
+        })
+      );
 
-    if (imageFiles.length === 0) return;
-
-    const promises = imageFiles.map(file => {
-      return new Promise<{ data: string; mimeType: string; fileName: string }>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => {
-          const result = reader.result as string;
-          // Remove the data URL prefix (e.g., "data:image/jpeg;base64,")
-          const base64Data = result.split(',')[1];
-          resolve({
-            data: base64Data,
-            mimeType: file.type,
-            fileName: file.name
-          });
-        };
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
-      });
-    });
-
-    Promise.all(promises).then(images => {
-      onImagesSelected?.(images);
-    });
+      onFilesSelected?.(parsedFiles);
+    } catch (error) {
+      console.error('File upload error:', error);
+      // Could add toast notification here
+    }
   };
 
   const handleClick = () => {
@@ -285,7 +281,9 @@ export const PromptInputImageUpload = ({
     const input = document.createElement('input');
     input.type = 'file';
     input.multiple = maxFiles > 1;
-    input.accept = accept;
+    if (accept !== "*") {
+      input.accept = accept;
+    }
     input.onchange = (e) => handleFileSelect((e.target as HTMLInputElement).files);
     input.click();
   };
@@ -303,9 +301,13 @@ export const PromptInputImageUpload = ({
       variant="ghost"
       onClick={handleClick}
       disabled={disabled}
+      title={tooltip}
       {...props}
     >
       <Paperclip className="size-4" />
     </Button>
   );
 };
+
+// Legacy export for backward compatibility
+export const PromptInputImageUpload = PromptInputFileUpload;

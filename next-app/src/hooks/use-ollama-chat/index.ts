@@ -111,10 +111,16 @@ export function useOllamaChat(chatId: string) {
       // Check if this exact message already exists
       const currentMessages = displayManager.getMessages()
       if (!messageAlreadyExists(currentMessages, params.text)) {
-        const userMessage = appendUser(params.text, params.images)
+        // Use structured user message if provided, otherwise create legacy format
+        const userMessage = params.userMessage || appendUser(params.text, params.images)
+        
+        // Add to display manager if it's a new structured message
+        if (params.userMessage) {
+          displayManager.addUserMessage(userMessage)
+        }
         
         // Persist user message to DB (fire-and-forget to avoid UI lag)
-        const dbParts = createDbMessageParts(params.text, params.images)
+        const dbParts = createDbMessageParts(params.text, params.images, params.userMessage)
         createMessageMutation.mutate(
           { chatId, role: 'USER', parts: dbParts, id: userMessage.id } as any,
           {
@@ -144,7 +150,22 @@ export function useOllamaChat(chatId: string) {
         const baseHistory = currentMessages.map((m) => {
           const textParts = m.parts.filter(p => p.type === 'text')
           const imageParts = m.parts.filter(p => p.type === 'image')
-          const content = textParts.map((p) => p.text).join(' ')
+          const fileParts = m.parts.filter(p => p.type === 'file')
+          
+          // Combine text content with file content for text/code files
+          let content = textParts.map((p) => p.text).join(' ')
+          
+          // Add file content for user messages (incorporate into text for the model)
+          if (m.role === 'user' && fileParts.length > 0) {
+            const fileContents = fileParts.map(file => 
+              `### ${file.fileName}\n\n${file.content || file.data}\n`
+            ).join('\n')
+            
+            if (fileContents) {
+              content += `\n\n## Attached Files\n\n${fileContents}`
+            }
+          }
+          
           const message: any = { role: m.role, content }
 
           // Add images for this message if it has any

@@ -17,6 +17,7 @@ export interface ChatSubmitParams {
   reasoningLevel?: 'low' | 'medium' | 'high'
   systemPromptContent?: string
   images?: Array<{ data: string; mimeType: string; fileName: string }>
+  userMessage?: UIMessage // Structured message with file parts
 }
 
 export interface SubmitHistoryParams {
@@ -75,8 +76,23 @@ export function createUserMessage(
 
 export function createDbMessageParts(
   text: string,
-  images?: Array<{ data: string; mimeType: string; fileName: string }>
+  images?: Array<{ data: string; mimeType: string; fileName: string }>,
+  userMessage?: UIMessage
 ): any[] {
+  // If we have a structured user message, use its parts
+  if (userMessage?.parts) {
+    return userMessage.parts.map(part => ({
+      type: part.type,
+      text: part.type === 'text' ? part.text : undefined,
+      data: part.type === 'image' || part.type === 'file' ? part.data : undefined,
+      mimeType: part.type === 'image' || part.type === 'file' ? part.mimeType : undefined,
+      fileName: part.type === 'image' || part.type === 'file' ? part.fileName : undefined,
+      content: part.type === 'file' ? part.content : undefined,
+      fileType: part.type === 'file' ? part.fileType : undefined,
+    }))
+  }
+  
+  // Fallback to legacy format
   const parts = [{ type: 'text', text }] as any
   if (images && images.length > 0) {
     parts.push(...images.map(img => ({ 

@@ -7,6 +7,8 @@ import { toast } from 'sonner'
 import { useChatStore } from '~/lib/chat-store'
 import ChatInput from '~/components/chat-input'
 import { Loader2, Paperclip } from 'lucide-react'
+import { parseFile, getFileType, getSupportedFileTypesDescription, getModelFileCapabilities, type FileUploadItem } from '~/lib/file-upload'
+import { useModelCapabilitiesCache } from '~/hooks/use-model-capabilities-cache'
 
 type ModelInfo = { name: string }
 
@@ -42,8 +44,14 @@ export default function Home() {
 
   const [prefill, setPrefill] = useState<string>('')
   const [isUserTyping, setIsUserTyping] = useState(false)
-  const [uploadedImages, setUploadedImages] = useState<Array<{ data: string; mimeType: string; fileName: string }>>([])
+  const [uploadedFiles, setUploadedFiles] = useState<Array<FileUploadItem>>([])
   const [isDragOver, setIsDragOver] = useState(false)
+  
+  // Get model capabilities for file type display
+  const { getCapabilities } = useModelCapabilitiesCache(models)
+  const currentModelCaps = getCapabilities(selectedModel)
+  const fileCapabilities = getModelFileCapabilities(currentModelCaps)
+  const supportedTypesDescription = getSupportedFileTypesDescription(fileCapabilities)
 
   // Drag and drop handlers
   const handleDragOver = (e: React.DragEvent) => {
@@ -61,52 +69,31 @@ export default function Home() {
     }
   }
 
-  const handleDrop = (e: React.DragEvent) => {
+  const handleDrop = async (e: React.DragEvent) => {
     e.preventDefault()
     setIsDragOver(false)
 
     const files = Array.from(e.dataTransfer.files)
-    const imageFiles = files.filter(file =>
-      file.type.startsWith('image/') &&
-      file.size <= 10 * 1024 * 1024 // 10MB limit
-    )
-
-    if (imageFiles.length === 0) {
-      toast.error('Unsupported file type', {
-        description: 'Please upload image files only (PNG, JPG, JPEG, GIF, WebP)'
+    
+    try {
+      const parsedFiles = await Promise.all(
+        files.map(async (file) => {
+          const fileType = getFileType(file)
+          if (!fileType) {
+            throw new Error(`Unsupported file type: ${file.name}`)
+          }
+          
+          return await parseFile(file, fileType)
+        })
+      )
+      
+      setUploadedFiles(prev => [...prev, ...parsedFiles])
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error'
+      toast.error('File upload error', {
+        description: message
       })
-      return
     }
-
-    const promises = imageFiles.map(file => {
-      return new Promise<{ data: string; mimeType: string; fileName: string }>((resolve, reject) => {
-        const reader = new FileReader()
-        reader.onload = () => {
-          const result = reader.result
-          if (!result) {
-            reject(new Error('Failed to read file'))
-            return
-          }
-          const resultStr = result as string
-          const base64Data = resultStr.split(',')[1]
-          if (!base64Data) {
-            reject(new Error('Invalid file format'))
-            return
-          }
-          resolve({
-            data: base64Data,
-            mimeType: file.type,
-            fileName: file.name
-          })
-        }
-        reader.onerror = reject
-        reader.readAsDataURL(file)
-      })
-    })
-
-    Promise.all(promises).then(images => {
-      setUploadedImages(prev => [...prev, ...images])
-    })
   }
 
   return (
@@ -130,8 +117,8 @@ export default function Home() {
               <Paperclip className="w-8 h-8 text-[#22c55e]" />
             </div>
             <div className="text-center">
-              <div className="text-[#e5e9e8] font-medium text-lg mb-2">Drop images here</div>
-              <div className="text-[#8b9491] text-sm">Supports: PNG, JPG, JPEG, GIF, WebP (max 10MB)</div>
+              <div className="text-[#e5e9e8] font-medium text-lg mb-2">Drop files here</div>
+              <div className="text-[#8b9491] text-sm">{supportedTypesDescription}</div>
             </div>
           </div>
         </div>
@@ -171,11 +158,12 @@ export default function Home() {
         prefillText={prefill}
         placement="page"
         maxWidthClass="max-w-3xl"
-        uploadedImages={uploadedImages}
-        onImagesChange={setUploadedImages}
+        uploadedFiles={uploadedFiles}
+        onFilesChange={setUploadedFiles}
+        hasImagesInHistory={false}
         onTypingStart={() => setIsUserTyping(true)}
         onTypingStop={() => setIsUserTyping(false)}
-        onSubmit={async ({ text, model, systemPromptContent, systemPromptId, images }) => {
+        onSubmit={async ({ text, model, systemPromptContent, systemPromptId, images, files, userMessage }) => {
           setIsNavigating(true)
           const id = crypto.randomUUID()
 
@@ -191,7 +179,9 @@ export default function Home() {
               m: model,
               s: systemPromptContent ?? null,
               sid: systemPromptId ?? null,
-              images: images ?? null
+              images: images ?? null,
+              files: files ?? null,
+              userMessage: userMessage ?? null
             }))
           } catch {}
 
@@ -200,7 +190,7 @@ export default function Home() {
 
           // Clear the form after successful submission
           setPrefill('')
-          setUploadedImages([])
+          setUploadedFiles([])
           
           // Navigate to chat page
           router.push(`/chat/${id}`)
