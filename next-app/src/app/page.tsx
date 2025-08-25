@@ -45,8 +45,27 @@ export default function Home() {
 
   const [prefill, setPrefill] = useState<string>('')
   const [isUserTyping, setIsUserTyping] = useState(false)
+  const [showPrompts, setShowPrompts] = useState(true)
+  const [isAnimatingOut, setIsAnimatingOut] = useState(false)
   const [uploadedFiles, setUploadedFiles] = useState<Array<FileUploadItem>>([])
   const [isDragOver, setIsDragOver] = useState(false)
+
+  // Handle prompt animations based on typing state
+  useEffect(() => {
+    if (isUserTyping && showPrompts) {
+      // Start exit animation
+      setIsAnimatingOut(true)
+      // Hide prompts after animation completes
+      const timer = setTimeout(() => {
+        setShowPrompts(false)
+        setIsAnimatingOut(false)
+      }, 400) // Match animation duration
+      return () => clearTimeout(timer)
+    } else if (!isUserTyping && !showPrompts) {
+      // Show prompts again when user stops typing
+      setShowPrompts(true)
+    }
+  }, [isUserTyping, showPrompts])
   
   // Get model capabilities for file type display
   const { getCapabilities } = useModelCapabilitiesCache(models)
@@ -138,10 +157,20 @@ export default function Home() {
         </div>
       )}
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-4 pt-[calc(max(15vh,2.5rem))]">
-        {!isUserTyping && (
+        {showPrompts && (
           <>
-            <h2 className="text-3xl font-semibold transition-opacity duration-300 ease-out">How can I help you?</h2>
-            <div className="flex flex-row flex-wrap gap-2.5 text-sm transition-opacity duration-300 ease-out">
+            <h2 className={`text-3xl font-semibold transition-all duration-400 ease-out ${
+              isAnimatingOut 
+                ? 'animate-out fade-out slide-out-to-top-4' 
+                : 'animate-in fade-in slide-in-from-bottom-4'
+            }`}>
+              How can I help you?
+            </h2>
+            <div className={`flex flex-row flex-wrap gap-2.5 text-sm transition-all duration-400 ease-out ${
+              isAnimatingOut 
+                ? 'animate-out fade-out slide-out-to-top-4' 
+                : 'animate-in fade-in slide-in-from-bottom-4'
+            }`}>
               {basePrompts.map((p) => (
                 <button
                   key={p}
