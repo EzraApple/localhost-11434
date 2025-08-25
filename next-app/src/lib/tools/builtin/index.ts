@@ -2,25 +2,25 @@
  * Built-in tools for the application
  */
 
-export { getSecretWordTool } from './get-secret-word';
-export { getSecondSecretWordTool } from './get-second-secret-word';
+export { calculateTool } from './calculate';
+export { getTimeTool } from './get-time';
 
-import { getSecretWordTool } from './get-secret-word';
-import { getSecondSecretWordTool } from './get-second-secret-word';
+import { calculateTool } from './calculate';
+import { getTimeTool } from './get-time';
 import { toolRegistry } from '../registry';
 
 /**
  * Register all built-in tools
  */
 export function registerBuiltinTools(): void {
-  toolRegistry.register(getSecretWordTool);
-  toolRegistry.register(getSecondSecretWordTool);
+  toolRegistry.register(calculateTool);
+  toolRegistry.register(getTimeTool);
 }
 
 /**
  * List of all built-in tools
  */
 export const builtinTools = [
-  getSecretWordTool,
-  getSecondSecretWordTool,
+  calculateTool,
+  getTimeTool,
 ];
