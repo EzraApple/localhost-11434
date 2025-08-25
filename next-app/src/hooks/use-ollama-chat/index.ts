@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useChatStore } from '~/lib/chat-store'
 import type { UIMessage } from '~/lib/chat-types'
 import { api } from '~/trpc/react'
-import { usePreloadedChatData } from '~/hooks/use-preloaded-chats'
+import { useCachedChatData } from '~/hooks/use-cached-chats'
 import {
   type ChatStatus,
   type StreamPhase,
@@ -54,14 +54,14 @@ export function useOllamaChat(chatId: string) {
   const createMessageMutation = api.messages.create.useMutation()
   const currentChatIdRef = useRef<string>(chatId)
 
-  // Check for preloaded data first
-  const { isPreloaded, chatData, isStale } = usePreloadedChatData(chatId)
+  // Use cache-first data loading (replaces usePreloadedChatData)
+  const { data: cachedChatData, source: cacheSource, isLoading: isCacheLoading, fromCache } = useCachedChatData(chatId)
 
-  // rehydrate chat state from DB per chat id - only query if not preloaded or data is stale
+  // Fallback to TRPC only if cache miss or specific scenarios
   const { data: initialData } = api.messages.list.useQuery(
     { chatId },
     { 
-      enabled: !!chatId && (!isPreloaded || isStale), 
+      enabled: !!chatId && !fromCache && cacheSource === 'not_found', 
       refetchOnWindowFocus: false, 
       refetchOnReconnect: false, 
       staleTime: 5_000 
@@ -86,34 +86,46 @@ export function useOllamaChat(chatId: string) {
     selectChat(chatId)
   }, [chatId, selectChat, displayManager])
 
-  // Hydrate messages from preloaded data or DB when data is available
+  // Hydrate messages from cache-first system
   useEffect(() => {
     let messages = null
     
-    if (isPreloaded && chatData?.messages && !isStale && currentChatIdRef.current === chatId) {
-      // Use preloaded data (fastest path)
-      messages = chatData.messages
+    console.log(`[useOllamaChat] Hydrating messages for ${chatId}`, { 
+      cacheSource, 
+      fromCache, 
+      hasCachedData: !!cachedChatData, 
+      messageCount: cachedChatData?.messages?.length || 0,
+      hasTrpcData: !!initialData?.messages
+    })
+    
+    if (cachedChatData?.messages && currentChatIdRef.current === chatId) {
+      // Use cached data (fastest path - Memory/IndexedDB)
+      messages = cachedChatData.messages
+      console.log(`[useOllamaChat] ✓ Using cached messages from ${cacheSource}: ${messages.length} messages`)
     } else if (initialData?.messages && currentChatIdRef.current === chatId) {
-      // Fall back to regular query data
+      // Fallback to TRPC data (SQLite)
       messages = initialData.messages
+      console.log(`[useOllamaChat] ⚠️ Fallback to TRPC messages: ${messages.length} messages`)
     }
     
     if (messages) {
       const fromDb = convertDbToUiMessages(messages)
       displayManager.hydrate(fromDb)
+      console.log(`[useOllamaChat] Hydrated ${fromDb.length} UI messages for ${chatId}`)
     }
-  }, [isPreloaded, chatData?.messages, isStale, initialData?.messages, chatId, displayManager])
+  }, [cachedChatData?.messages, initialData?.messages, chatId, displayManager, cacheSource, fromCache])
 
   // Force refetch when returning to this chat to ensure fresh data
-  // Skip refetch if we have fresh preloaded data
+  // Only refetch if we had to fall back to TRPC (cache miss)
   useEffect(() => {
     const refetchData = async () => {
-      if (chatId && currentChatIdRef.current === chatId && (!isPreloaded || isStale)) {
+      if (chatId && currentChatIdRef.current === chatId && cacheSource === 'not_found') {
+        console.log(`[useOllamaChat] Refetching messages for ${chatId} due to cache miss`)
         await utils.messages.list.refetch({ chatId })
       }
     }
     refetchData()
-  }, [chatId, utils, isPreloaded, isStale])
+  }, [chatId, utils, cacheSource])
 
   const appendUser = useCallback((text: string, images?: Array<{ data: string; mimeType: string; fileName: string }>) => {
     const msg = createUserMessage(text, images)
@@ -146,8 +158,8 @@ export function useOllamaChat(chatId: string) {
           {
             onSuccess: () => {
               displayManager.markAsPersisted(userMessage.id)
-              // Invalidate preloaded cache since we added a new message
-              utils.chats.preloadImportantChats.invalidate()
+              console.log(`[useOllamaChat] ✓ Persisted user message ${userMessage.id}`)
+              // Note: Cache is already updated optimistically via displayManager
             },
             onError: (e) => {
               console.warn('[chat] failed to persist user message:', e?.message || 'Unknown error')
@@ -275,8 +287,8 @@ export function useOllamaChat(chatId: string) {
             {
               onSuccess: () => {
                 utils.messages.list.invalidate({ chatId })
-                // Invalidate preloaded cache since we deleted messages
-                utils.chats.preloadImportantChats.invalidate()
+
+                // Cache updates handled optimistically by displayManager
                 resolve()
               },
               onError: (e) => {
@@ -301,8 +313,7 @@ export function useOllamaChat(chatId: string) {
             onSuccess: () => {
               displayManager.markAsPersisted(editedMessage.id)
               utils.messages.list.invalidate({ chatId })
-              // Invalidate preloaded cache since we modified a message
-              utils.chats.preloadImportantChats.invalidate()
+              console.log(`[useOllamaChat] ✓ Persisted edited message ${editedMessage.id}`)
               resolve()
             },
             onError: (e) => {
@@ -359,8 +370,8 @@ export function useOllamaChat(chatId: string) {
             {
               onSuccess: () => {
                 utils.messages.list.invalidate({ chatId })
-                // Invalidate preloaded cache since we deleted messages
-                utils.chats.preloadImportantChats.invalidate()
+
+                // Cache updates handled optimistically by displayManager
                 resolve()
               },
               onError: (e) => {

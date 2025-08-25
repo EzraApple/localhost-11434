@@ -20,7 +20,7 @@ async function createWindow(): Promise<void> {
   await win.loadURL(url)
   
   // Open dev tools for debugging
-  // win.webContents.openDevTools()
+  win.webContents.openDevTools()
 }
 
 app.whenReady().then(async () => {

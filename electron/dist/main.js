@@ -18,7 +18,7 @@ async function createWindow() {
     const url = getDevServerURL();
     await win.loadURL(url);
     // Open dev tools for debugging
-    // win.webContents.openDevTools()
+    win.webContents.openDevTools();
 }
 electron_1.app.whenReady().then(async () => {
     await createWindow();
