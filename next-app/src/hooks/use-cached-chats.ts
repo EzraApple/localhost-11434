@@ -12,6 +12,7 @@ export function useCachedChats() {
   const [allChats, setAllChats] = useState<CachedChat[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<Error | null>(null)
+  const [recentlyDeletedChats, setRecentlyDeletedChats] = useState<Set<string>>(new Set())
 
   const cacheManager = getCacheManager()
 
@@ -70,22 +71,24 @@ export function useCachedChats() {
       const chatsResponse = await utils.chats.list.fetch()
       const sqliteChats = chatsResponse.chats
 
-      // Convert SQLite format to cache format
-      const cacheChats: CachedChat[] = sqliteChats.map(chat => ({
-        id: chat.id,
-        title: chat.title,
-        createdAt: new Date(chat.createdAt as any),
-        lastMessageAt: chat.lastMessageAt ? new Date(chat.lastMessageAt as any) : null,
-        pinned: !!chat.pinned,
-        pinnedAt: chat.pinnedAt ? new Date(chat.pinnedAt as any) : null,
-        lastSetModel: chat.lastSetModel || null,
-        lastSetPrompt: chat.lastSetPrompt || null,
-        cachedAt: new Date(),
-        version: 1,
-        isDirty: false,
-        messageCount: 0, // Will be updated when messages are loaded
-        lastSyncedAt: new Date()
-      }))
+      // Convert SQLite format to cache format, excluding recently deleted chats
+      const cacheChats: CachedChat[] = sqliteChats
+        .filter(chat => !recentlyDeletedChats.has(chat.id)) // Exclude recently deleted chats
+        .map(chat => ({
+          id: chat.id,
+          title: chat.title,
+          createdAt: new Date(chat.createdAt as any),
+          lastMessageAt: chat.lastMessageAt ? new Date(chat.lastMessageAt as any) : null,
+          pinned: !!chat.pinned,
+          pinnedAt: chat.pinnedAt ? new Date(chat.pinnedAt as any) : null,
+          lastSetModel: chat.lastSetModel || null,
+          lastSetPrompt: chat.lastSetPrompt || null,
+          cachedAt: new Date(),
+          version: 1,
+          isDirty: false,
+          messageCount: 0, // Will be updated when messages are loaded
+          lastSyncedAt: new Date()
+        }))
 
       // Update local state
       setAllChats(cacheChats)
@@ -154,7 +157,81 @@ export function useCachedChats() {
     } catch (err) {
       console.error('[useCachedChats] Background sync failed:', err)
     }
-  }, [utils, cacheManager])
+  }, [utils, cacheManager, recentlyDeletedChats])
+
+  // Delete chat from local state and cache
+  const deleteChat = useCallback(async (chatId: string): Promise<boolean> => {
+    try {
+      console.log(`[useCachedChats] Deleting chat ${chatId}...`)
+      
+      // Add to recently deleted set to prevent background sync from re-adding it
+      setRecentlyDeletedChats(prev => new Set([...prev, chatId]))
+      
+      // Remove from local state immediately
+      setAllChats(prev => prev.filter(chat => chat.id !== chatId))
+      
+      // Remove from cache layers
+      const success = await cacheManager.deleteChat(chatId)
+      
+      if (success) {
+        console.log(`[useCachedChats] ✓ Successfully deleted chat ${chatId}`)
+        
+        // Clear from recently deleted after a delay to ensure server-side deletion completes
+        setTimeout(() => {
+          setRecentlyDeletedChats(prev => {
+            const newSet = new Set(prev)
+            newSet.delete(chatId)
+            return newSet
+          })
+        }, 5000) // 5 second grace period
+        
+      } else {
+        console.warn(`[useCachedChats] ⚠️ Failed to delete chat ${chatId} from cache`)
+        
+        // Remove from recently deleted since deletion failed
+        setRecentlyDeletedChats(prev => {
+          const newSet = new Set(prev)
+          newSet.delete(chatId)
+          return newSet
+        })
+        
+        // Re-add to local state if cache deletion failed
+        const chatsResponse = await utils.chats.list.fetch()
+        const restoredChat = chatsResponse.chats.find(c => c.id === chatId)
+        if (restoredChat) {
+          const cachedChat: CachedChat = {
+            id: restoredChat.id,
+            title: restoredChat.title,
+            createdAt: new Date(restoredChat.createdAt as any),
+            lastMessageAt: restoredChat.lastMessageAt ? new Date(restoredChat.lastMessageAt as any) : null,
+            pinned: !!restoredChat.pinned,
+            pinnedAt: restoredChat.pinnedAt ? new Date(restoredChat.pinnedAt as any) : null,
+            lastSetModel: restoredChat.lastSetModel || null,
+            lastSetPrompt: restoredChat.lastSetPrompt || null,
+            cachedAt: new Date(),
+            version: 1,
+            isDirty: false,
+            messageCount: 0,
+            lastSyncedAt: new Date()
+          }
+          setAllChats(prev => [...prev, cachedChat])
+        }
+      }
+      
+      return success
+    } catch (error) {
+      console.error(`[useCachedChats] Error deleting chat ${chatId}:`, error)
+      
+      // Remove from recently deleted on error
+      setRecentlyDeletedChats(prev => {
+        const newSet = new Set(prev)
+        newSet.delete(chatId)
+        return newSet
+      })
+      
+      return false
+    }
+  }, [cacheManager, utils])
 
   return {
     allChats,
@@ -162,6 +239,9 @@ export function useCachedChats() {
     isLoading,
     error,
     cacheManager,
+    
+    // Delete chat from cache and local state
+    deleteChat,
     
     // Force refresh cache from SQLite
     refreshCache: backgroundSyncChats,

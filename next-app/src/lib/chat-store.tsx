@@ -34,7 +34,7 @@ export function ChatStoreProvider({ children }: { children: React.ReactNode }) {
   const [selectedModel, setSelectedModelState] = useState<string | null>(null)
 
   // Use new cache-first chat system (replaces usePreloadedChats + direct TRPC)
-  const { allChats: cachedChats, isInitialized: cacheInitialized, cacheManager } = useCachedChats()
+  const { allChats: cachedChats, isInitialized: cacheInitialized, cacheManager, deleteChat: deleteChatFromCache } = useCachedChats()
   
   // Fallback to TRPC for initial load if cache is not ready
   const { data: chatsData } = api.chats.list.useQuery(undefined, { 
@@ -175,10 +175,10 @@ export function ChatStoreProvider({ children }: { children: React.ReactNode }) {
     
     console.log(`[ChatStore] Deleting chat ${id}`)
     
-    // Remove from cache immediately
-    if (cacheManager) {
+    // Remove from cache immediately using useCachedChats method
+    if (deleteChatFromCache) {
       console.log(`[ChatStore] Removing chat ${id} from cache...`)
-      cacheManager.deleteChat(id).catch(err => {
+      deleteChatFromCache(id).catch(err => {
         console.warn(`[ChatStore] Failed to remove chat ${id} from cache:`, err)
       })
     }
@@ -196,7 +196,7 @@ export function ChatStoreProvider({ children }: { children: React.ReactNode }) {
         // TODO: Re-add to cache if deletion failed
       },
     })
-  }, [chats, deleteChatMutation, selectedChatId, utils, cacheManager])
+  }, [chats, deleteChatMutation, selectedChatId, utils, deleteChatFromCache])
 
   const storeValue = useMemo<ChatStore>(() => ({
     chats,

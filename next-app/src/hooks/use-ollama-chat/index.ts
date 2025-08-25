@@ -240,10 +240,9 @@ export function useOllamaChat(chatId: string) {
             continue
           }
 
-          // Handle reasoning and text chunks
-          if (chunk.kind === 'reasoning' || chunk.kind === 'text') {
-            displayManager.updateStreamingMessage(chunk, assistantId)
-          }
+          // Handle all chunk types (reasoning, text, tool_call, tool_result, stream_continue)
+          console.log('[useOllamaChat] Processing chunk:', chunk);
+          displayManager.updateStreamingMessage(chunk, assistantId)
         }
 
         displayManager.setStatus('ready')
@@ -448,10 +447,9 @@ export function useOllamaChat(chatId: string) {
           continue
         }
 
-        // Handle reasoning and text chunks
-        if (chunk.kind === 'reasoning' || chunk.kind === 'text') {
-          displayManager.updateStreamingMessage(chunk, assistantId)
-        }
+        // Handle all chunk types (reasoning, text, tool_call, tool_result, stream_continue)
+        console.log('[useOllamaChat] Processing chunk:', chunk);
+        displayManager.updateStreamingMessage(chunk, assistantId)
       }
       
       displayManager.setStatus('ready')
@@ -482,6 +480,10 @@ export function useOllamaChat(chatId: string) {
     editMessage,
     retryMessage,
     abort,
+    // Expose tool calls and display manager for UI components
+    displayManager,
+    reasoningToolCalls: displayManager.getReasoningToolCalls(),
+    responseToolCalls: displayManager.getResponseToolCalls(),
   }
 }
 

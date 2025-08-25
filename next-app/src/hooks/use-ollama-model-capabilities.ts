@@ -5,7 +5,7 @@ import { api } from '~/trpc/react'
 
 export type ModelCapabilities = {
   model: string
-  capabilities: { completion: boolean; vision: boolean }
+  capabilities: { completion: boolean; vision: boolean; tools: boolean }
   think: { supported: boolean; levels: ('low' | 'medium' | 'high')[] }
 }
 

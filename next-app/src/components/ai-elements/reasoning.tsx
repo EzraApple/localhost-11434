@@ -11,6 +11,8 @@ import { BrainIcon, ChevronDownIcon } from 'lucide-react';
 import type { ComponentProps } from 'react';
 import { createContext, memo, useContext, useEffect, useState } from 'react';
 import { Response } from './response';
+import { Tool, ToolHeader, ToolContent, ToolInput, ToolOutput } from './tool';
+import type { ToolCall } from '~/lib/tools/types';
 
 type ReasoningContextValue = {
   isStreaming: boolean;
@@ -160,10 +162,11 @@ export type ReasoningContentProps = ComponentProps<
   typeof CollapsibleContent
 > & {
   children: string;
+  toolCalls?: ToolCall[];
 };
 
 export const ReasoningContent = memo(
-  ({ className, children, ...props }: ReasoningContentProps) => (
+  ({ className, children, toolCalls, ...props }: ReasoningContentProps) => (
     <CollapsibleContent
       className={cn(
         'mt-4 text-sm',
@@ -172,7 +175,32 @@ export const ReasoningContent = memo(
       )}
       {...props}
     >
-      <Response className="grid gap-2">{children}</Response>
+      <div className="grid gap-2">
+        <Response>{children}</Response>
+        
+        {/* Render tool calls that happened during reasoning */}
+        {toolCalls && toolCalls.length > 0 && (
+          <div className="space-y-2 mt-2">
+            {toolCalls.map((toolCall) => (
+              <Tool key={toolCall.id} className="bg-muted/30">
+                <ToolHeader 
+                  type={toolCall.name} 
+                  state={toolCall.state}
+                />
+                <ToolContent>
+                  <ToolInput input={toolCall.arguments} />
+                  {(toolCall.result !== undefined || toolCall.error) && (
+                    <ToolOutput 
+                      output={toolCall.result} 
+                      errorText={toolCall.error} 
+                    />
+                  )}
+                </ToolContent>
+              </Tool>
+            ))}
+          </div>
+        )}
+      </div>
     </CollapsibleContent>
   )
 );

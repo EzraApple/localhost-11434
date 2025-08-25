@@ -29,7 +29,7 @@ export const Tool = ({ className, ...props }: ToolProps) => (
 );
 
 export type ToolHeaderProps = {
-  type: ToolUIPart['type'];
+  type: ToolUIPart['type'] | string;  // Allow string for tool names
   state: ToolUIPart['state'];
   className?: string;
 };
@@ -135,7 +135,13 @@ export const ToolOutput = ({
         )}
       >
         {errorText && <div>{errorText}</div>}
-        {output && <div>{output}</div>}
+        {output && (
+          <div>
+            <pre className="whitespace-pre-wrap font-mono text-xs">
+              {typeof output === 'string' ? output : JSON.stringify(output, null, 2)}
+            </pre>
+          </div>
+        )}
       </div>
     </div>
   );

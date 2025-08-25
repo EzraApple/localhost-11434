@@ -15,7 +15,7 @@ export type OllamaModel = {
 
 export type CapabilityResponse = {
   model: string
-  capabilities: { completion: boolean; vision: boolean }
+  capabilities: { completion: boolean; vision: boolean; tools: boolean }
   think: { supported: boolean; levels: ('low' | 'medium' | 'high')[] }
 }
 
@@ -66,6 +66,7 @@ async function getCapabilities(model: string): Promise<CapabilityResponse> {
 
   const hasVision = declaredCapabilities.includes('vision')
   const hasCompletion = declaredCapabilities.includes('completion') || declaredCapabilities.length === 0
+  const hasTools = declaredCapabilities.includes('tools')
 
   const levels: ('low' | 'medium' | 'high')[] = []
   const tryLevel = async (level: 'low' | 'medium' | 'high') => {
@@ -90,9 +91,42 @@ async function getCapabilities(model: string): Promise<CapabilityResponse> {
   if (medOk) levels.push('medium')
   if (highOk) levels.push('high')
 
+  // Test for tools capability if not declared
+  let toolsSupported = hasTools
+  if (!hasTools) {
+    try {
+      // Test with a simple tool to see if the model supports function calling
+      await client.chat({
+        model,
+        messages: [{ role: 'user', content: 'hi' }],
+        stream: false,
+        tools: [{
+          type: 'function',
+          function: {
+            name: 'test_tool',
+            description: 'Test tool for capability detection',
+            parameters: { type: 'object', properties: {}, required: [] }
+          }
+        }],
+        keep_alive: 0 as any,
+        options: { num_predict: 1 } as any,
+      } as any)
+      toolsSupported = true
+    } catch (e) {
+      const msg = String((e as Error)?.message || e || '')
+      // If error mentions tools/functions, model likely doesn't support them
+      if (/tool|function|invalid/i.test(msg)) {
+        toolsSupported = false
+      } else {
+        // Other errors might not be tool-related, assume support
+        toolsSupported = true
+      }
+    }
+  }
+
   return {
     model,
-    capabilities: { completion: hasCompletion, vision: hasVision },
+    capabilities: { completion: hasCompletion, vision: hasVision, tools: toolsSupported },
     think: { supported: levels.length > 0, levels },
   }
 }

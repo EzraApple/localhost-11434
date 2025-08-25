@@ -6,7 +6,7 @@ import { Separator } from '~/components/ui/separator'
 import { Input } from '~/components/ui/input'
 import { Button } from '~/components/ui/button'
 import { useOllamaModelCapabilities } from '~/hooks/use-ollama-model-capabilities'
-import { Brain, Image as ImageIcon } from 'lucide-react'
+import { Brain, Image as ImageIcon, Wrench } from 'lucide-react'
 import { toast } from 'sonner'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '~/components/ui/dialog'
 
@@ -132,6 +132,7 @@ function ModelRow({ name, meta, size, pendingPercent, onRemoved, isPulling }: { 
   // Only show capabilities for non-pending models
   const hasThink = !isPending && (data?.think.supported ?? false)
   const hasVision = !isPending && (data?.capabilities.vision ?? false)
+  const hasTools = !isPending && (data?.capabilities.tools ?? false)
   const toSize = (bytes?: number) => {
     if (!bytes || bytes <= 0) return '—'
     const gb = bytes / (1024 * 1024 * 1024)
@@ -205,6 +206,9 @@ function ModelRow({ name, meta, size, pendingPercent, onRemoved, isPulling }: { 
               </span>
               <span title={hasVision ? 'Supports vision' : 'No vision support'} className={hasVision ? 'text-emerald-300' : 'text-neutral-500'}>
                 <ImageIcon className="h-4 w-4 inline" />
+              </span>
+              <span title={hasTools ? 'Supports tool calling' : 'No tool calling support'} className={hasTools ? 'text-emerald-300' : 'text-neutral-500'}>
+                <Wrench className="h-4 w-4 inline" />
               </span>
             </div>
             <div className="text-xs text-neutral-300">{toSize(size)}</div>

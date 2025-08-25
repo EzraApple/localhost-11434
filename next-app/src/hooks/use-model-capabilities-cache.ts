@@ -13,6 +13,7 @@ export function useModelCapabilitiesCache(models: Array<{ name: string }>) {
   const utils = api.useUtils()
   
   const getCapabilities = (modelName: string): ModelCapabilities | null => {
+    console.log('getCapabilities', modelName, cache[modelName])
     return cache[modelName] || null
   }
   
@@ -60,7 +61,7 @@ export function useModelCapabilitiesCache(models: Array<{ name: string }>) {
       // Individual errors are handled above
     })
   }, [models, cache, loadingModels, utils])
-  
+
   return {
     getCapabilities,
     cache,

@@ -10,6 +10,7 @@ import type { ComponentProps, HTMLAttributes } from 'react';
 import { MessageActions } from './message-actions';
 import { MessageEdit } from './message-edit';
 import { MessageFile } from './message-file';
+import { Tool, ToolHeader, ToolContent, ToolInput, ToolOutput } from './tool';
 import type { UIMessage as LocalUIMessage } from '~/lib/chat-types';
 
 export type MessageProps = HTMLAttributes<HTMLDivElement> & {

@@ -9,6 +9,7 @@ import { Conversation, ConversationContent } from '~/components/ai-elements/conv
 import { Message, MessageContent, MessageImage } from '~/components/ai-elements/message'
 import { Reasoning, ReasoningContent, ReasoningTrigger } from '~/components/ai-elements/reasoning'
 import { Response } from '~/components/ai-elements/response'
+import { Tool, ToolHeader, ToolContent, ToolInput, ToolOutput } from '~/components/ai-elements/tool'
 import { useChatStore } from '~/lib/chat-store'
 import { toast } from 'sonner'
 import { Paperclip } from 'lucide-react'
@@ -54,7 +55,21 @@ export default function ChatByIdPage() {
   const chat = chats.find(c => c.id === String(id))
   const lastSetPrompt = chat?.lastSetPrompt || undefined
 
-  const { messages, status, streamPhase, submit, editMessage, retryMessage, abort } = useOllamaChat(String(id))
+  const { 
+    messages, 
+    status, 
+    streamPhase, 
+    submit, 
+    editMessage, 
+    retryMessage, 
+    abort,
+    reasoningToolCalls,
+    responseToolCalls,
+    displayManager
+  } = useOllamaChat(String(id))
+
+  // Debug: Log tool calls whenever they change (optional - can be removed in production)
+  // console.log('[Chat] Tool calls update:', { reasoningToolCalls: reasoningToolCalls.length, responseToolCalls: responseToolCalls.length })
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null)
   const [isDragOver, setIsDragOver] = useState(false)
   const [uploadedFiles, setUploadedFiles] = useState<Array<FileUploadItem>>([])
@@ -333,13 +348,54 @@ export default function ChatByIdPage() {
                       return (
                         <Reasoning key={`reasoning-${idx}`} isStreaming={streamPhase === 'reasoning'} defaultOpen={false}>
                           <ReasoningTrigger />
-                          <ReasoningContent>{p.text}</ReasoningContent>
+                          <ReasoningContent 
+                            toolCalls={
+                              // Show reasoning tool calls for any streaming assistant message or the last assistant message
+                              m.role === 'assistant' && (
+                                (status === 'streaming' && m.id === messages[messages.length - 1]?.id) ||
+                                (status === 'ready' && reasoningToolCalls.length > 0)
+                              ) ? reasoningToolCalls : []
+                            }
+                          >
+                            {p.text}
+                          </ReasoningContent>
                         </Reasoning>
                       )
                     }
                     if (p.type === 'text' && m.role === 'assistant') {
                       // For assistant messages, render text as Response component
-                      return <Response key={`response-${idx}`} isWaiting={status === 'submitted' && idx === 0 && m.role === 'assistant'}>{p.text}</Response>
+                      return (
+                        <div key={`response-${idx}`}>
+                          <Response isWaiting={status === 'submitted' && idx === 0 && m.role === 'assistant'}>{p.text}</Response>
+                          
+                          {/* Render tool calls that happened during response phase */}
+                          {m.role === 'assistant' && responseToolCalls.length > 0 && (
+                            (status === 'streaming' && m.id === messages[messages.length - 1]?.id) ||
+                            (status === 'ready')
+                          ) && (
+                            <div className="space-y-2 mt-2">
+                              <div className="text-xs font-medium text-muted-foreground mb-1">Tool Calls:</div>
+                              {responseToolCalls.map((toolCall) => (
+                                <Tool key={`tool-${toolCall.id}`}>
+                                  <ToolHeader 
+                                    type={toolCall.name} 
+                                    state={toolCall.state}
+                                  />
+                                  <ToolContent>
+                                    <ToolInput input={toolCall.arguments} />
+                                    {(toolCall.result !== undefined || toolCall.error) && (
+                                      <ToolOutput 
+                                        output={toolCall.result} 
+                                        errorText={toolCall.error} 
+                                      />
+                                    )}
+                                  </ToolContent>
+                                </Tool>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )
                     }
                     // text, image, and file parts are handled by MessageContent component
                     return null

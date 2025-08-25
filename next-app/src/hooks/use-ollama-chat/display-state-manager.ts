@@ -1,6 +1,7 @@
 import type { UIMessage } from '~/lib/chat-types'
 import type { ChatStatus, StreamPhase, StreamChunk } from './utils'
 import { updateMessagesWithStreamChunk, calculateReasoningDuration } from './utils'
+import type { ToolCall } from '~/lib/tools/types'
 
 export interface DisplayState {
   messages: UIMessage[]
@@ -9,6 +10,8 @@ export interface DisplayState {
   reasoningDurations: Record<string, number>
   currentAssistantId: string | null
   reasoningStart: number | null
+  reasoningToolCalls?: Map<string, ToolCall>  // Optional for backward compatibility
+  responseToolCalls?: Map<string, ToolCall>   // Optional for backward compatibility
 }
 
 export class DisplayStateManager {
@@ -65,6 +68,16 @@ export class DisplayStateManager {
   }
 
   setCurrentAssistantId(id: string | null): void {
+    // When starting a new assistant message, clear previous tool calls
+    if (id && id !== this.displayState.currentAssistantId) {
+      console.log('[DisplayManager] Starting new assistant message, clearing previous tool calls');
+      if (this.displayState.reasoningToolCalls) {
+        this.displayState.reasoningToolCalls.clear();
+      }
+      if (this.displayState.responseToolCalls) {
+        this.displayState.responseToolCalls.clear();
+      }
+    }
     this.displayState.currentAssistantId = id
   }
 
@@ -75,6 +88,82 @@ export class DisplayStateManager {
   // === Streaming Updates ===
 
   updateStreamingMessage(chunk: StreamChunk, assistantId: string): void {
+    // Ensure tool call Maps are initialized
+    if (!this.displayState.reasoningToolCalls) {
+      this.displayState.reasoningToolCalls = new Map();
+    }
+    if (!this.displayState.responseToolCalls) {
+      this.displayState.responseToolCalls = new Map();
+    }
+
+    // Handle tool calls
+    if (chunk.kind === 'tool_call' && chunk.toolCall) {
+      const { toolCall } = chunk;
+      const toolCallData: ToolCall = {
+        id: toolCall.id,
+        name: toolCall.name,
+        arguments: toolCall.arguments,
+        state: 'input-available',
+        phase: toolCall.phase,
+      };
+
+      console.log('[DisplayManager] Processing tool call:', toolCallData);
+
+      if (toolCall.phase === 'reasoning') {
+        this.displayState.reasoningToolCalls.set(toolCall.id, toolCallData);
+        console.log('[DisplayManager] Added reasoning tool call, total:', this.displayState.reasoningToolCalls.size);
+      } else {
+        this.displayState.responseToolCalls.set(toolCall.id, toolCallData);
+        console.log('[DisplayManager] Added response tool call, total:', this.displayState.responseToolCalls.size);
+      }
+      this.notifyStateChange();
+      return;
+    }
+
+    // Handle tool results
+    if (chunk.kind === 'tool_result' && chunk.toolResult) {
+      const { toolResult } = chunk;
+      console.log('[DisplayManager] Processing tool result:', toolResult);
+      
+      const targetMap = toolResult.phase === 'reasoning' 
+        ? this.displayState.reasoningToolCalls 
+        : this.displayState.responseToolCalls;
+      
+      // Ensure target map exists
+      if (targetMap) {
+        const existing = targetMap.get(toolResult.id);
+        console.log('[DisplayManager] Looking for tool call with ID:', toolResult.id);
+        console.log('[DisplayManager] Available tool call IDs:', Array.from(targetMap.keys()));
+        
+        if (existing) {
+          const updated: ToolCall = {
+            ...existing,
+            result: toolResult.result,
+            error: toolResult.error,
+            state: toolResult.error ? 'output-error' : 'output-available'
+          };
+          console.log('[DisplayManager] Updating tool call with result:', updated);
+          targetMap.set(toolResult.id, updated);
+          this.notifyStateChange();
+        } else {
+          console.log('[DisplayManager] ❌ Tool call not found for result ID:', toolResult.id);
+          console.log('[DisplayManager] Available tool calls:', Array.from(targetMap.values()));
+        }
+      }
+      return;
+    }
+
+    // Handle stream continuation
+    if (chunk.kind === 'stream_continue') {
+      // Just notify - don't reset anything, preserve all tool calls
+      console.log('[DisplayManager] Stream continuing, preserving tool calls:', {
+        reasoning: this.displayState.reasoningToolCalls?.size || 0,
+        response: this.displayState.responseToolCalls?.size || 0
+      });
+      this.notifyStateChange();
+      return;
+    }
+
     if (chunk.kind !== 'reasoning' && chunk.kind !== 'text') return
 
     const result = updateMessagesWithStreamChunk(
@@ -108,6 +197,12 @@ export class DisplayStateManager {
     }
     this.displayState.currentAssistantId = null
     this.displayState.reasoningStart = null
+    
+    // DON'T clear tool calls here - they should persist until the next message
+    console.log('[DisplayManager] Finalized reasoning, preserving tool calls:', {
+      reasoning: this.getReasoningToolCalls().length,
+      response: this.getResponseToolCalls().length
+    });
   }
 
   // === Error Handling ===
@@ -245,6 +340,8 @@ export class DisplayStateManager {
       reasoningDurations: {},
       currentAssistantId: null,
       reasoningStart: null,
+      reasoningToolCalls: new Map(),
+      responseToolCalls: new Map(),
     }
     this.persistedState = []
     this.notifyStateChange()
@@ -278,6 +375,49 @@ export class DisplayStateManager {
 
   hasErrorMessages(): boolean {
     return this.displayState.messages.some(m => (m as any).metadata?.isError)
+  }
+
+  // === Tool Call Access ===
+
+  getReasoningToolCalls(): ToolCall[] {
+    // Defensive initialization for backward compatibility
+    if (!this.displayState.reasoningToolCalls) {
+      this.displayState.reasoningToolCalls = new Map();
+    }
+    const calls = Array.from(this.displayState.reasoningToolCalls.values());
+    console.log('[DisplayManager] Getting reasoning tool calls:', calls.length, calls);
+    return calls;
+  }
+
+  getResponseToolCalls(): ToolCall[] {
+    // Defensive initialization for backward compatibility
+    if (!this.displayState.responseToolCalls) {
+      this.displayState.responseToolCalls = new Map();
+    }
+    const calls = Array.from(this.displayState.responseToolCalls.values());
+    console.log('[DisplayManager] Getting response tool calls:', calls.length, calls);
+    return calls;
+  }
+
+  getAllToolCalls(): ToolCall[] {
+    return [
+      ...this.getReasoningToolCalls(),
+      ...this.getResponseToolCalls()
+    ]
+  }
+
+  clearToolCalls(): void {
+    // Ensure tool call Maps are initialized before clearing
+    if (!this.displayState.reasoningToolCalls) {
+      this.displayState.reasoningToolCalls = new Map();
+    }
+    if (!this.displayState.responseToolCalls) {
+      this.displayState.responseToolCalls = new Map();
+    }
+    
+    this.displayState.reasoningToolCalls.clear();
+    this.displayState.responseToolCalls.clear();
+    this.notifyStateChange();
   }
 
   // === Debug Info ===

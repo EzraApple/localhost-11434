@@ -6,9 +6,22 @@ export type ChatStatus = 'ready' | 'submitted' | 'streaming' | 'error'
 export type StreamPhase = 'idle' | 'reasoning' | 'answer'
 
 export interface StreamChunk {
-  kind: 'reasoning' | 'text' | 'error' | 'done'
+  kind: 'reasoning' | 'text' | 'error' | 'done' | 'tool_call' | 'tool_result' | 'stream_continue'
   text?: string
   error?: string
+  toolCall?: {
+    id: string
+    name: string
+    arguments: Record<string, any>
+    phase: 'reasoning' | 'response'
+  }
+  toolResult?: {
+    id: string
+    result?: any
+    error?: string
+    phase: 'reasoning' | 'response'
+  }
+  isContinuation?: boolean
 }
 
 export interface ChatSubmitParams {
@@ -169,6 +182,15 @@ export function updateMessagesWithStreamChunk(
   updatedPhase: StreamPhase,
   shouldUpdatePhase: boolean 
 } {
+  // Handle tool calls and results - don't update messages directly as they're managed by DisplayStateManager
+  if (chunk.kind === 'tool_call' || chunk.kind === 'tool_result' || chunk.kind === 'stream_continue') {
+    return { 
+      updatedMessages: messages, 
+      updatedPhase: streamPhase,
+      shouldUpdatePhase: false 
+    }
+  }
+
   if (chunk.kind !== 'reasoning' && chunk.kind !== 'text') {
     return { 
       updatedMessages: messages, 
