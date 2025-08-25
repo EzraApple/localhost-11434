@@ -10,11 +10,17 @@ export async function POST(req: Request) {
       keepAlive?: string;
     };
 
+    console.log(`[preload-api] Received preload request for model: "${model}", keepAlive: ${keepAlive}`);
+
     if (!model) {
+      console.log('[preload-api] No model provided, returning 400');
       return NextResponse.json({ error: "Model is required" }, { status: 400 });
     }
 
     try {
+      const startTime = Date.now();
+      console.log(`[preload-api] Starting Ollama generate call for model: ${model}`);
+      
       // Minimal generation call to warm up the model in memory
       await client.generate({
         model,
@@ -27,10 +33,14 @@ export async function POST(req: Request) {
         stream: false
       });
 
+      const duration = Date.now() - startTime;
+      console.log(`[preload-api] ✅ Successfully preloaded model ${model} in ${duration}ms`);
+
       return NextResponse.json({ 
         success: true, 
         model, 
         keepAlive,
+        duration,
         message: `Model ${model} preloaded and will stay in memory for ${keepAlive}` 
       });
     } catch (e: unknown) {

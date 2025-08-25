@@ -406,28 +406,60 @@ export function ChatInput({ models, defaultModel, chatId, defaultSystemPromptId,
             <PromptInputTextarea
               value={text}
               onChange={(e) => {
-                setText(e.target.value)
-                // Call onTypingStart when user starts typing (from empty to non-empty)
-                // But not if the text was set via prefill
-                if (!text && e.target.value && !hasCalledTypingStart.current && !isTextFromPrefill.current) {
+                const newValue = e.target.value
+                const wasEmpty = !text || text.trim() === ''
+                const hasContent = newValue && newValue.trim() !== ''
+                
+                // Reset prefill flag immediately when user starts typing anything different
+                if (isTextFromPrefill.current && newValue !== prefillText) {
+                  console.log('[preload] Resetting prefill flag - user is typing manually')
+                  isTextFromPrefill.current = false
+                }
+                
+                setText(newValue)
+                
+                // Call onTypingStart when transitioning from empty to non-empty
+                // More reliable logic that handles copy-paste and various edge cases
+                const shouldPreload = wasEmpty && hasContent && !hasCalledTypingStart.current && !isTextFromPrefill.current
+                
+                console.log('[preload] onChange debug:', {
+                  wasEmpty,
+                  hasContent,
+                  hasCalledTypingStart: hasCalledTypingStart.current,
+                  isTextFromPrefill: isTextFromPrefill.current,
+                  model,
+                  shouldPreload,
+                  text: `"${text}"`,
+                  newValue: `"${newValue}"`
+                })
+                
+                if (shouldPreload) {
                   hasCalledTypingStart.current = true
+                  
+                  console.log('[preload] 🚀 User started typing, preloading model:', model)
                   
                   // Preload the current model to warm it up
                   if (model) {
                     preloadModel(model)
+                  } else {
+                    console.warn('[preload] ⚠️  No model selected, cannot preload')
                   }
                   
                   // Call the original onTypingStart callback
                   onTypingStart?.()
+                } else {
+                  console.log('[preload] ❌ Not preloading due to conditions above')
                 }
                 // Call onTypingStop when user deletes all text (from non-empty to empty)
-                if (text && !e.target.value && onTypingStop && hasCalledTypingStart.current) {
+                if (!wasEmpty && !hasContent && onTypingStop && hasCalledTypingStart.current) {
                   hasCalledTypingStart.current = false
                   onTypingStop()
                 }
-                // Reset prefill flag when user starts modifying the text
-                if (isTextFromPrefill.current && e.target.value !== prefillText) {
-                  isTextFromPrefill.current = false
+                
+                // Always reset typing flag when text becomes empty (handles cmd+backspace and other edge cases)
+                if (!hasContent && hasCalledTypingStart.current) {
+                  console.log('[preload] Text is empty, resetting typing flag for next preload')
+                  hasCalledTypingStart.current = false
                 }
               }}
               placeholder={placeholder}
