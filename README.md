@@ -1,10 +1,10 @@
-# Ollama Chat
+# Localhost 11434
 
-A T3 Chat-inspired chat application for your local Ollama models. Ollama Desk provides a clean, modern interface for interacting with AI models that run entirely on your laptop, with a focus on real functionality and beautiful design.
+A T3 Chat-inspired chat application for your local Ollama models. It provides a clean, modern interface for interacting with AI models that run entirely on your laptop, with a focus on real functionality and beautiful design.
 
-## What is Ollama Chat?
+## What is Localhost 11434?
 
-Ollama Chat is a desktop chat application built with the T3 Stack that connects to your local Ollama instance. It's designed for users who want to chat with AI models while maintaining privacy and control over their data - everything runs locally on your machine.
+It is a desktop chat application built with Next.js and Electron that connects to your local Ollama instance. It's designed for users who want to chat with AI models while maintaining privacy and control over their data - everything runs locally on your machine.
 
 ### Current Features
 
@@ -14,11 +14,10 @@ Ollama Chat is a desktop chat application built with the T3 Stack that connects 
 - **Persistent Chat History**: All conversations are stored locally in SQLite
 - **Clean UI**: Modern, responsive interface built with Radix UI and Tailwind CSS
 - **Desktop App**: Available as both a web app and Electron desktop application
-
-### Future Features
-
 - **Tool Calling**: Execute functions and tools through AI models
 - **MCP Client**: Model Context Protocol client to expose and manage tools
+
+### Future Features
 - **Knowledge Base**: Upload documents and files for intelligent context retrieval
 - **Advanced Model Testing**: Comprehensive testing and evaluation tools
 
