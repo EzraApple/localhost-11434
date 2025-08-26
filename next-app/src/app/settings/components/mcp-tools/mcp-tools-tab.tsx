@@ -57,7 +57,10 @@ export default function McpToolsTab() {
             {servers.map((server, index) => (
               <div key={server.id}>
                 <McpServerCard
-                  server={server}
+                  server={{
+                    ...server,
+                    args: Array.isArray(server.args) ? server.args as string[] : []
+                  }}
                   status={statuses?.[server.id] || 'disconnected'}
                   onUpdate={refetch}
                   isFirst={index === 0}

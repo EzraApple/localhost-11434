@@ -258,7 +258,11 @@ class ServerMcpManager {
           const serverTools: ToolSchema[] = response.tools.map(tool => ({
             name: tool.name,
             description: tool.description || `Tool from ${serverName}`,
-            parameters: tool.inputSchema || { type: 'object', properties: {}, required: [] }
+            parameters: {
+              type: 'object',
+              properties: (tool.inputSchema?.properties as Record<string, any>) || {},
+              required: tool.inputSchema?.required || []
+            }
           }));
           
           allTools.push(...serverTools);
@@ -292,7 +296,11 @@ class ServerMcpManager {
       return response.tools.map(tool => ({
         name: tool.name,
         description: tool.description || `Tool from ${serverName}`,
-        parameters: tool.inputSchema || { type: 'object', properties: {}, required: [] }
+        parameters: {
+          type: 'object',
+          properties: (tool.inputSchema?.properties as Record<string, any>) || {},
+          required: tool.inputSchema?.required || []
+        }
       }));
       
     } catch (error) {

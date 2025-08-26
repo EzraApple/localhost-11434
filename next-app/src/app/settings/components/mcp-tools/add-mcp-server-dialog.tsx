@@ -25,7 +25,7 @@ export function AddMcpServerDialog({ open, onOpenChange, onServerAdded }: AddMcp
   })
   const [customCommand, setCustomCommand] = useState('')
   const [useCustomCommand, setUseCustomCommand] = useState(false)
-  const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null)
+  const [testResult, setTestResult] = useState<{ success: boolean; message?: string; error?: string } | null>(null)
 
   // Common package managers
   const commonCommands = [
@@ -247,7 +247,7 @@ export function AddMcpServerDialog({ open, onOpenChange, onServerAdded }: AddMcp
                 ) : (
                   <XCircle className="h-4 w-4" />
                 )}
-                <span>{testResult.message}</span>
+                <span>{testResult.message || testResult.error}</span>
               </div>
             )}
           </div>
