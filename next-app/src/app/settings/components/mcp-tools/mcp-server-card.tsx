@@ -15,7 +15,7 @@ interface McpServerCardProps {
     id: string
     name: string
     command: string
-    args: string[] | any
+    args: string[]
     enabled: boolean
     createdAt: Date
     updatedAt: Date
