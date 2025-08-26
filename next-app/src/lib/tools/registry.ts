@@ -1,4 +1,5 @@
 import type { ToolFunction, ToolSchema } from './types';
+import { serverMcpManager } from '~/lib/mcp/server-client-manager';
 
 /**
  * Tool Registry for managing available tools
@@ -21,9 +22,27 @@ export class ToolRegistry {
   }
 
   /**
-   * Get all available tool schemas for Ollama
+   * Get all available tool schemas for Ollama (including MCP tools)
    */
-  list(): ToolSchema[] {
+  async list(): Promise<ToolSchema[]> {
+    // Start with built-in tools (always available)
+    const builtinTools = Array.from(this.tools.values()).map(tool => tool.schema);
+    
+    try {
+      // Add MCP tools from connected servers
+      const mcpTools = await serverMcpManager.getAvailableTools();
+      console.log(`[ToolRegistry] Available tools: ${builtinTools.length} built-in + ${mcpTools.length} MCP`);
+      return [...builtinTools, ...mcpTools];
+    } catch (error) {
+      console.warn('[ToolRegistry] Failed to get MCP tools, using built-in only:', error);
+      return builtinTools;
+    }
+  }
+  
+  /**
+   * Get all available tool schemas for Ollama (sync version for backward compatibility)
+   */
+  listSync(): ToolSchema[] {
     return Array.from(this.tools.values()).map(tool => tool.schema);
   }
 
@@ -49,18 +68,27 @@ export class ToolRegistry {
   }
 
   /**
-   * Execute a tool by name with arguments
+   * Execute a tool by name with arguments (tries built-in first, then MCP)
    */
   async execute(name: string, args: Record<string, any>): Promise<any> {
-    const tool = this.tools.get(name);
-    if (!tool) {
-      throw new Error(`Tool "${name}" not found`);
+    // Try built-in tools first (fastest path)
+    const builtinTool = this.tools.get(name);
+    if (builtinTool) {
+      try {
+        console.log(`[ToolRegistry] Executing built-in tool: ${name}`);
+        return await builtinTool.execute(args);
+      } catch (error) {
+        throw new Error(`Built-in tool "${name}" execution failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }
     }
     
+    // Try MCP tools if built-in not found
     try {
-      return await tool.execute(args);
-    } catch (error) {
-      throw new Error(`Tool "${name}" execution failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      console.log(`[ToolRegistry] Tool ${name} not found in built-in, trying MCP servers...`);
+      return await serverMcpManager.callTool(name, args);
+    } catch (mcpError) {
+      // If MCP also fails, throw a comprehensive error
+      throw new Error(`Tool "${name}" not found in built-in tools or MCP servers`);
     }
   }
 }

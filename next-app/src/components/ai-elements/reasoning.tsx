@@ -13,6 +13,7 @@ import { createContext, memo, useContext, useEffect, useState } from 'react';
 import { Response } from './response';
 import { Tool, ToolHeader, ToolContent, ToolInput, ToolOutput } from './tool';
 import type { ToolCall } from '~/lib/tools/types';
+import type { ReasoningEvent } from '~/hooks/use-ollama-chat/display-state-manager';
 
 type ReasoningContextValue = {
   isStreaming: boolean;
@@ -163,46 +164,112 @@ export type ReasoningContentProps = ComponentProps<
 > & {
   children: string;
   toolCalls?: ToolCall[];
+  reasoningTimeline?: ReasoningEvent[];
 };
 
 export const ReasoningContent = memo(
-  ({ className, children, toolCalls, ...props }: ReasoningContentProps) => (
-    <CollapsibleContent
-      className={cn(
-        'mt-4 text-sm',
-        'data-[state=closed]:fade-out-0 data-[state=closed]:slide-out-to-top-2 data-[state=open]:slide-in-from-top-2 text-muted-foreground outline-none data-[state=closed]:animate-out data-[state=open]:animate-in',
-        className
-      )}
-      {...props}
-    >
-      <div className="grid gap-2">
-        <Response>{children}</Response>
-        
-        {/* Render tool calls that happened during reasoning */}
-        {toolCalls && toolCalls.length > 0 && (
-          <div className="space-y-2 mt-2">
-            {toolCalls.map((toolCall) => (
-              <Tool key={toolCall.id} className="bg-muted/30">
-                <ToolHeader 
-                  type={toolCall.name} 
-                  state={toolCall.state}
-                />
-                <ToolContent>
-                  <ToolInput input={toolCall.arguments} />
-                  {(toolCall.result !== undefined || toolCall.error) && (
-                    <ToolOutput 
-                      output={toolCall.result} 
-                      errorText={toolCall.error} 
-                    />
-                  )}
-                </ToolContent>
-              </Tool>
-            ))}
-          </div>
+  ({ className, children, toolCalls, reasoningTimeline, ...props }: ReasoningContentProps) => {
+    // If we have a timeline, use it for inline rendering, otherwise fall back to legacy behavior
+    const useTimeline = reasoningTimeline && reasoningTimeline.length > 0;
+    
+    return (
+      <CollapsibleContent
+        className={cn(
+          'mt-4 text-sm',
+          'data-[state=closed]:fade-out-0 data-[state=closed]:slide-out-to-top-2 data-[state=open]:slide-in-from-top-2 text-muted-foreground outline-none data-[state=closed]:animate-out data-[state=open]:animate-in',
+          className
         )}
-      </div>
-    </CollapsibleContent>
-  )
+        {...props}
+      >
+        <div className="grid gap-2">
+          {useTimeline ? (
+            // Render timeline with inline tool calls - group text chunks together
+            <>
+              {(() => {
+                const groupedElements: React.ReactNode[] = [];
+                let currentTextChunks: string[] = [];
+                let textChunkIndex = 0;
+
+                const flushTextChunks = () => {
+                  if (currentTextChunks.length > 0) {
+                    groupedElements.push(
+                      <Response key={`text-group-${textChunkIndex++}`}>
+                        {currentTextChunks.join('')}
+                      </Response>
+                    );
+                    currentTextChunks = [];
+                  }
+                };
+
+                reasoningTimeline.forEach((event, index) => {
+                  if (event.type === 'text') {
+                    currentTextChunks.push(event.content || '');
+                  } else if (event.type === 'tool_call' && event.toolCall) {
+                    // Flush any accumulated text before the tool call
+                    flushTextChunks();
+                    
+                    // Add the tool call with proper spacing
+                    groupedElements.push(
+                      <div key={`tool-wrapper-${event.toolCall.id}-${index}`} className="mt-2">
+                        <Tool className="bg-muted/30">
+                          <ToolHeader 
+                            type={event.toolCall.name} 
+                            state={event.toolCall.state}
+                          />
+                          <ToolContent>
+                            <ToolInput input={event.toolCall.arguments} />
+                            {(event.toolCall.result !== undefined || event.toolCall.error) && (
+                              <ToolOutput 
+                                output={event.toolCall.result} 
+                                errorText={event.toolCall.error} 
+                              />
+                            )}
+                          </ToolContent>
+                        </Tool>
+                      </div>
+                    );
+                  }
+                });
+
+                // Flush any remaining text chunks
+                flushTextChunks();
+
+                return groupedElements;
+              })()}
+            </>
+          ) : (
+            // Legacy behavior - render text first, then tool calls
+            <>
+              <Response>{children}</Response>
+              
+              {/* Render tool calls that happened during reasoning (legacy) */}
+              {toolCalls && toolCalls.length > 0 && (
+                <div className="space-y-2 mt-2">
+                  {toolCalls.map((toolCall) => (
+                    <Tool key={toolCall.id} className="bg-muted/30">
+                      <ToolHeader 
+                        type={toolCall.name} 
+                        state={toolCall.state}
+                      />
+                      <ToolContent>
+                        <ToolInput input={toolCall.arguments} />
+                        {(toolCall.result !== undefined || toolCall.error) && (
+                          <ToolOutput 
+                            output={toolCall.result} 
+                            errorText={toolCall.error} 
+                          />
+                        )}
+                      </ToolContent>
+                    </Tool>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      </CollapsibleContent>
+    );
+  }
 );
 
 Reasoning.displayName = 'Reasoning';

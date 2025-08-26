@@ -484,6 +484,8 @@ export function useOllamaChat(chatId: string) {
     displayManager,
     reasoningToolCalls: displayManager.getReasoningToolCalls(),
     responseToolCalls: displayManager.getResponseToolCalls(),
+    reasoningTimeline: displayManager.getReasoningTimeline(),
+    responseTimeline: displayManager.getResponseTimeline(),
   }
 }
 

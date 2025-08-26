@@ -8,11 +8,12 @@ import dynamic from 'next/dynamic'
 
 const ModelsTab = dynamic(() => import('./components/models/models-tab'), { ssr: false })
 const SystemPromptsTab = dynamic(() => import('./components/system-prompts/system-prompts-tab'), { ssr: false })
+const McpToolsTab = dynamic(() => import('./components/mcp-tools/mcp-tools-tab'), { ssr: false })
 
 export default function SettingsPage() {
   const router = useRouter()
   const [activeTab, setActiveTab] = React.useState<
-    "system-prompts" | "models" | "knowledge-base"
+    "system-prompts" | "models" | "mcp-tools" | "knowledge-base"
   >("system-prompts")
 
   function handleBack() {
@@ -82,6 +83,16 @@ export default function SettingsPage() {
               variant="ghost"
               className={
                 "h-8 px-3 text-neutral-200 hover:text-[#d3e6e2] hover:bg-[#113936]/20 " +
+                (activeTab === "mcp-tools" ? "bg-[#113936]/40 text-white" : "")
+              }
+              onClick={() => setActiveTab("mcp-tools")}
+            >
+              MCP Tools
+            </Button>
+            <Button
+              variant="ghost"
+              className={
+                "h-8 px-3 text-neutral-200 hover:text-[#d3e6e2] hover:bg-[#113936]/20 " +
                 (activeTab === "knowledge-base" ? "bg-[#113936]/40 text-white" : "")
               }
               onClick={() => setActiveTab("knowledge-base")}
@@ -95,6 +106,7 @@ export default function SettingsPage() {
           <h1 className="text-2xl font-semibold tracking-tight text-neutral-100">
             {activeTab === "system-prompts" && "System Prompts"}
             {activeTab === "models" && "Models"}
+            {activeTab === "mcp-tools" && "MCP Tools"}
             {activeTab === "knowledge-base" && "Knowledge Base"}
           </h1>
         </div>
@@ -103,6 +115,13 @@ export default function SettingsPage() {
           <div className="mt-6 flex w-full justify-center">
             <div className="w-full max-w-4xl px-4">
               <ModelsTab />
+            </div>
+          </div>
+        ) : null}
+        {activeTab === 'mcp-tools' ? (
+          <div className="mt-6 flex w-full justify-center">
+            <div className="w-full max-w-4xl px-4">
+              <McpToolsTab />
             </div>
           </div>
         ) : null}

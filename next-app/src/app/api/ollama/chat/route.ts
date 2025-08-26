@@ -223,7 +223,7 @@ export async function POST(req: Request) {
                }
 
                // Get available tools if enabled and model supports them
-               const availableTools = enableTools && modelSupportsTools ? toolRegistry.list() : [];
+               const availableTools = enableTools && modelSupportsTools ? await toolRegistry.list() : [];
                const ollamaTools = availableTools.map(tool => ({
                  type: 'function',
                  function: {

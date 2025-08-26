@@ -4,6 +4,7 @@ import { messagesRouter } from "~/server/api/routers/messages";
 import { createCallerFactory, createTRPCRouter } from "~/server/api/trpc";
 import { systemPromptsRouter } from "~/server/api/routers/system-prompts";
 import { pdfRouter } from "~/server/api/routers/pdf";
+import { mcpRouter } from "~/server/api/routers/mcp";
 
 /**
  * This is the primary router for your server.
@@ -16,6 +17,7 @@ export const appRouter = createTRPCRouter({
   messages: messagesRouter,
   systemPrompts: systemPromptsRouter,
   pdf: pdfRouter,
+  mcp: mcpRouter,
 });
 
 // export type definition of API

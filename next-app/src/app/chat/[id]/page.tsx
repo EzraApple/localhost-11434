@@ -65,6 +65,8 @@ export default function ChatByIdPage() {
     abort,
     reasoningToolCalls,
     responseToolCalls,
+    reasoningTimeline,
+    responseTimeline,
     displayManager
   } = useOllamaChat(String(id))
 
@@ -349,12 +351,12 @@ export default function ChatByIdPage() {
                         <Reasoning key={`reasoning-${idx}`} isStreaming={streamPhase === 'reasoning'} defaultOpen={false}>
                           <ReasoningTrigger />
                           <ReasoningContent 
-                            toolCalls={
-                              // Show reasoning tool calls for any streaming assistant message or the last assistant message
+                            reasoningTimeline={
+                              // Show reasoning timeline for any streaming assistant message or the last assistant message
                               m.role === 'assistant' && (
                                 (status === 'streaming' && m.id === messages[messages.length - 1]?.id) ||
-                                (status === 'ready' && reasoningToolCalls.length > 0)
-                              ) ? reasoningToolCalls : []
+                                (status === 'ready' && reasoningTimeline.length > 0)
+                              ) ? reasoningTimeline : []
                             }
                           >
                             {p.text}

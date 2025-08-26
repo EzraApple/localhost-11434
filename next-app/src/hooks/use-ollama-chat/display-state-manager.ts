@@ -3,6 +3,13 @@ import type { ChatStatus, StreamPhase, StreamChunk } from './utils'
 import { updateMessagesWithStreamChunk, calculateReasoningDuration } from './utils'
 import type { ToolCall } from '~/lib/tools/types'
 
+export interface ReasoningEvent {
+  type: 'text' | 'tool_call'
+  timestamp: number
+  content?: string
+  toolCall?: ToolCall
+}
+
 export interface DisplayState {
   messages: UIMessage[]
   status: ChatStatus
@@ -12,6 +19,8 @@ export interface DisplayState {
   reasoningStart: number | null
   reasoningToolCalls?: Map<string, ToolCall>  // Optional for backward compatibility
   responseToolCalls?: Map<string, ToolCall>   // Optional for backward compatibility
+  reasoningTimeline?: ReasoningEvent[]        // New timeline for inline rendering
+  responseTimeline?: ReasoningEvent[]         // New timeline for response phase
 }
 
 export class DisplayStateManager {
@@ -28,6 +37,8 @@ export class DisplayStateManager {
       reasoningDurations: {},
       currentAssistantId: null,
       reasoningStart: null,
+      reasoningTimeline: [],
+      responseTimeline: [],
     }
     this.persistedState = []
   }
@@ -68,15 +79,18 @@ export class DisplayStateManager {
   }
 
   setCurrentAssistantId(id: string | null): void {
-    // When starting a new assistant message, clear previous tool calls
+    // When starting a new assistant message, clear previous tool calls and timelines
     if (id && id !== this.displayState.currentAssistantId) {
-      console.log('[DisplayManager] Starting new assistant message, clearing previous tool calls');
+      console.log('[DisplayManager] Starting new assistant message, clearing previous tool calls and timelines');
       if (this.displayState.reasoningToolCalls) {
         this.displayState.reasoningToolCalls.clear();
       }
       if (this.displayState.responseToolCalls) {
         this.displayState.responseToolCalls.clear();
       }
+      // Clear timelines for new message
+      this.displayState.reasoningTimeline = [];
+      this.displayState.responseTimeline = [];
     }
     this.displayState.currentAssistantId = id
   }
@@ -88,12 +102,18 @@ export class DisplayStateManager {
   // === Streaming Updates ===
 
   updateStreamingMessage(chunk: StreamChunk, assistantId: string): void {
-    // Ensure tool call Maps are initialized
+    // Ensure tool call Maps and timelines are initialized
     if (!this.displayState.reasoningToolCalls) {
       this.displayState.reasoningToolCalls = new Map();
     }
     if (!this.displayState.responseToolCalls) {
       this.displayState.responseToolCalls = new Map();
+    }
+    if (!this.displayState.reasoningTimeline) {
+      this.displayState.reasoningTimeline = [];
+    }
+    if (!this.displayState.responseTimeline) {
+      this.displayState.responseTimeline = [];
     }
 
     // Handle tool calls
@@ -111,9 +131,21 @@ export class DisplayStateManager {
 
       if (toolCall.phase === 'reasoning') {
         this.displayState.reasoningToolCalls.set(toolCall.id, toolCallData);
+        // Add to reasoning timeline
+        this.displayState.reasoningTimeline.push({
+          type: 'tool_call',
+          timestamp: Date.now(),
+          toolCall: toolCallData
+        });
         console.log('[DisplayManager] Added reasoning tool call, total:', this.displayState.reasoningToolCalls.size);
       } else {
         this.displayState.responseToolCalls.set(toolCall.id, toolCallData);
+        // Add to response timeline  
+        this.displayState.responseTimeline.push({
+          type: 'tool_call',
+          timestamp: Date.now(),
+          toolCall: toolCallData
+        });
         console.log('[DisplayManager] Added response tool call, total:', this.displayState.responseToolCalls.size);
       }
       this.notifyStateChange();
@@ -128,6 +160,10 @@ export class DisplayStateManager {
       const targetMap = toolResult.phase === 'reasoning' 
         ? this.displayState.reasoningToolCalls 
         : this.displayState.responseToolCalls;
+      
+      const targetTimeline = toolResult.phase === 'reasoning'
+        ? this.displayState.reasoningTimeline
+        : this.displayState.responseTimeline;
       
       // Ensure target map exists
       if (targetMap) {
@@ -144,6 +180,24 @@ export class DisplayStateManager {
           };
           console.log('[DisplayManager] Updating tool call with result:', updated);
           targetMap.set(toolResult.id, updated);
+          
+          // Update the existing tool call in the timeline
+          if (targetTimeline) {
+            const toolCallIndex = targetTimeline.findIndex(
+              event => event.type === 'tool_call' && event.toolCall?.id === toolResult.id
+            );
+            if (toolCallIndex !== -1) {
+              // Update the tool call in place
+              targetTimeline[toolCallIndex] = {
+                ...targetTimeline[toolCallIndex]!,
+                toolCall: updated
+              };
+              console.log('[DisplayManager] Updated tool call in timeline at index:', toolCallIndex);
+            } else {
+              console.log('[DisplayManager] ❌ Tool call not found in timeline for result ID:', toolResult.id);
+            }
+          }
+          
           this.notifyStateChange();
         } else {
           console.log('[DisplayManager] ❌ Tool call not found for result ID:', toolResult.id);
@@ -165,6 +219,15 @@ export class DisplayStateManager {
     }
 
     if (chunk.kind !== 'reasoning' && chunk.kind !== 'text') return
+
+    // Add reasoning text to timeline
+    if (chunk.kind === 'reasoning' && chunk.text) {
+      this.displayState.reasoningTimeline?.push({
+        type: 'text',
+        timestamp: Date.now(),
+        content: chunk.text
+      });
+    }
 
     const result = updateMessagesWithStreamChunk(
       this.displayState.messages,
@@ -342,6 +405,8 @@ export class DisplayStateManager {
       reasoningStart: null,
       reasoningToolCalls: new Map(),
       responseToolCalls: new Map(),
+      reasoningTimeline: [],
+      responseTimeline: [],
     }
     this.persistedState = []
     this.notifyStateChange()
@@ -420,6 +485,16 @@ export class DisplayStateManager {
     this.notifyStateChange();
   }
 
+  // === Timeline Access ===
+
+  getReasoningTimeline(): ReasoningEvent[] {
+    return this.displayState.reasoningTimeline || []
+  }
+
+  getResponseTimeline(): ReasoningEvent[] {
+    return this.displayState.responseTimeline || []
+  }
+
   // === Debug Info ===
   getDebugInfo() {
     return {
@@ -429,6 +504,8 @@ export class DisplayStateManager {
       streamPhase: this.displayState.streamPhase,
       hasErrors: this.hasErrorMessages(),
       chatId: this.chatId,
+      reasoningTimelineLength: this.displayState.reasoningTimeline?.length || 0,
+      responseTimelineLength: this.displayState.responseTimeline?.length || 0,
     }
   }
 }
