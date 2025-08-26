@@ -23,7 +23,7 @@ It is a desktop chat application built with Next.js and Electron that connects t
 
 ## Prerequisites
 
-Before running Ollama Chat, you'll need:
+Before running Localhost 11434, you'll need:
 
 - **Node.js 18+** and **pnpm** (recommended) or npm
 - **Ollama** installed and running locally
